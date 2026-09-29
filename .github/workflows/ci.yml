@@ -1,0 +1,50 @@
+name: CI
+
+# Roda a cada push e a cada pull request. E a evidencia de que o requisito de
+# testes do enunciado esta atendido de forma continua, e nao apenas uma vez.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    # Chave descartavel: o CI nao serve trafego real. A chave de producao vive
+    # apenas nas variaveis de ambiente do Render.
+    env:
+      DJANGO_SECRET_KEY: chave-descartavel-apenas-para-o-ci-nao-usar-em-producao
+      DJANGO_ALLOWED_HOSTS: localhost
+      DJANGO_SSL_REDIRECT: "False"
+      # SQLite de proposito: makemigrations --check ABRE conexao com o banco, e
+      # uma URL de Postgres inexistente faria o CI travar esperando o servidor.
+      # A suite de testes ignora esta variavel e usa o proprio SQLite dela.
+      DATABASE_URL: "sqlite:///ci.sqlite3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          # Mesma versao usada em producao no Render, declarada em render.yaml.
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verificacoes do Django
+        run: python manage.py check
+
+      - name: Conferir que nao falta migration
+        # Falha se alguem alterou um model e esqueceu de gerar a migration.
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Testes
+        run: pytest -q
+
+      - name: Coletar estaticos
+        # Garante que o collectstatic do build.sh nao vai quebrar no deploy.
+        run: python manage.py collectstatic --no-input

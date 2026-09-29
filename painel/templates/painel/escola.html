@@ -1,0 +1,85 @@
+{% extends "painel/base.html" %}
+
+{% block titulo %}{{ escola.nome }} | EducaAlerta{% endblock %}
+
+{% block conteudo %}
+<nav aria-label="Trilha de navegação">
+  <p><a href="{% url 'painel' %}">Painel</a> &rsaquo; {{ escola.nome }}</p>
+</nav>
+
+<h1>{{ escola.nome }}</h1>
+
+<dl class="cartoes">
+  <div class="cartao"><dt>Código INEP</dt><dd>{{ escola.co_entidade }}</dd></div>
+  <div class="cartao"><dt>UF</dt><dd>{{ escola.uf }}</dd></div>
+  <div class="cartao"><dt>Município</dt><dd>{{ escola.municipio.nome|default:"sem dado" }}</dd></div>
+  <div class="cartao"><dt>Rede</dt><dd>{{ escola.get_rede_display }}</dd></div>
+</dl>
+
+<h2>Índice de risco por ano</h2>
+{% if riscos %}
+  <div class="tabela-rolavel">
+    <table>
+      <caption>
+        Índice de risco calculado para esta escola. O nível aparece em texto,
+        não apenas por cor. Versão do índice: <code>{{ versao_indice }}</code>.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Ano</th>
+          <th scope="col" class="numero">Índice</th>
+          <th scope="col">Nível de risco</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in riscos %}
+          <tr>
+            <th scope="row">{{ r.obj.ano }}</th>
+            <td class="numero">{{ r.obj.score|floatformat:3 }}</td>
+            <td><span class="tarja tarja-{{ r.obj.classe }}">{{ r.rotulo }}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p>Nenhum índice calculado para esta escola.</p>
+{% endif %}
+
+<h2>Indicadores por ano</h2>
+{% if indicadores %}
+  <div class="tabela-rolavel">
+    <table>
+      <caption>Indicadores públicos do INEP para esta escola, em porcentagem, exceto o INSE.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Ano</th>
+          <th scope="col" class="numero">Aprovação</th>
+          <th scope="col" class="numero">Reprovação</th>
+          <th scope="col" class="numero">Abandono</th>
+          <th scope="col" class="numero">Distorção idade-série</th>
+          <th scope="col" class="numero">INSE</th>
+          <th scope="col">Origem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in indicadores %}
+          <tr>
+            <th scope="row">{{ i.ano }}</th>
+            <td class="numero">{{ i.taxa_aprovacao|floatformat:1|default:"sem dado" }}</td>
+            <td class="numero">{{ i.taxa_reprovacao|floatformat:1|default:"sem dado" }}</td>
+            <td class="numero">{{ i.taxa_abandono|floatformat:1|default:"sem dado" }}</td>
+            <td class="numero">{{ i.distorcao_idade_serie|floatformat:1|default:"sem dado" }}</td>
+            <td class="numero">{{ i.inse|floatformat:2|default:"sem dado" }}</td>
+            <td>{{ i.origem }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p>Nenhum indicador carregado para esta escola.</p>
+{% endif %}
+
+<p><a href="/api/escolas/{{ escola.co_entidade }}/">Ver estes dados na API em JSON</a></p>
+{% endblock %}

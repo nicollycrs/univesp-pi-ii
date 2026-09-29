@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ------------------------------------------------------------ EducaAlerta
+# Segredos
+.env
+
+# Microdados brutos do INEP: arquivos de varios GB. Nunca versionar.
+# O README explica de onde baixar e como rodar o ETL.
+/dados_brutos/
+
+# Estaticos coletados (gerados pelo collectstatic)
+/staticfiles/
+
+# Banco local de desenvolvimento
+db.sqlite3
+db.sqlite3-journal
+
+# Amostra de desenvolvimento: dados NAO reais, gerados por manage.py gerar_amostra
+/dados_processados/AMOSTRA_DESENVOLVIMENTO.csv

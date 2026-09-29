@@ -1,0 +1,142 @@
+{% extends "painel/base.html" %}
+{% load static %}
+
+{% block titulo %}Painel de risco escolar | EducaAlerta{% endblock %}
+
+{% block conteudo %}
+<h1>Risco de abandono e reprovação na educação básica</h1>
+
+<p class="introducao">
+  As escolas são ordenadas por um índice de risco calculado a partir de taxas de
+  reprovação e abandono, distorção idade-série e nível socioeconômico, todos
+  indicadores públicos do INEP. O método está descrito na
+  <a href="{% url 'sobre' %}">página de metodologia</a>.
+</p>
+
+{% if sem_dados %}
+  <div class="aviso" role="status">
+    <strong>Nenhum dado carregado ainda.</strong>
+    Execute <code>python manage.py carregar_dados</code> para popular a base.
+    As instruções estão no <code>README.md</code>.
+  </div>
+{% else %}
+
+<form id="filtros" class="filtros" aria-labelledby="titulo-filtros">
+  <h2 id="titulo-filtros">Filtros</h2>
+  <div class="campos">
+    <p class="campo">
+      <label for="f-uf">Unidade federativa</label>
+      <select id="f-uf" name="uf">
+        <option value="">Todas</option>
+        {% for uf in ufs %}<option value="{{ uf }}">{{ uf }}</option>{% endfor %}
+      </select>
+    </p>
+    <p class="campo">
+      <label for="f-ano">Ano de referência</label>
+      <select id="f-ano" name="ano">
+        {% for ano in anos %}
+          <option value="{{ ano }}" {% if ano == ano_padrao %}selected{% endif %}>{{ ano }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    <p class="campo">
+      <label for="f-classe">Nível de risco</label>
+      <select id="f-classe" name="classe">
+        <option value="">Todos</option>
+        <option value="alto">Risco alto</option>
+        <option value="medio">Risco médio</option>
+        <option value="baixo">Risco baixo</option>
+      </select>
+    </p>
+    <p class="campo">
+      <button type="submit">Aplicar filtros</button>
+    </p>
+  </div>
+</form>
+
+{# Regiao de status anunciada por leitor de tela quando o conteudo muda por
+   JavaScript, sem exigir que a pessoa procure a mudanca na tela. #}
+<p id="status" class="status" role="status" aria-live="polite">Carregando dados.</p>
+
+<section aria-labelledby="titulo-resumo">
+  <h2 id="titulo-resumo">Resumo</h2>
+  <dl class="cartoes" id="cartoes">
+    <div class="cartao"><dt>Escolas</dt><dd id="c-escolas">&ndash;</dd></div>
+    <div class="cartao"><dt>Abandono médio</dt><dd id="c-abandono">&ndash;</dd></div>
+    <div class="cartao"><dt>Reprovação média</dt><dd id="c-reprovacao">&ndash;</dd></div>
+    <div class="cartao"><dt>Distorção idade-série média</dt><dd id="c-distorcao">&ndash;</dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="titulo-graficos">
+  <h2 id="titulo-graficos">Gráficos</h2>
+
+  <div class="grafico-bloco">
+    <h3 id="titulo-g1">Escolas por nível de risco</h3>
+    {# O grafico tem role img e um resumo textual. Alem disso, os mesmos dados
+       aparecem em tabela abaixo: criterio 1.1.1 (Conteudo Nao Textual, nivel A). #}
+    <canvas id="g-classes" height="220" role="img" aria-labelledby="titulo-g1" aria-describedby="resumo-g1"></canvas>
+    <p id="resumo-g1" class="resumo-grafico">Distribuição da quantidade de escolas em cada nível de risco.</p>
+    <details>
+      <summary>Ver os dados do gráfico em tabela</summary>
+      <table id="t-classes">
+        <caption>Quantidade de escolas por nível de risco</caption>
+        <thead><tr><th scope="col">Nível de risco</th><th scope="col">Escolas</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </div>
+
+  <div class="grafico-bloco">
+    <h3 id="titulo-g2">Nível socioeconômico e taxa de abandono</h3>
+    <canvas id="g-dispersao" height="260" role="img" aria-labelledby="titulo-g2" aria-describedby="resumo-g2"></canvas>
+    <p id="resumo-g2" class="resumo-grafico">
+      Cada ponto é uma escola. O eixo horizontal traz o INSE, indicador de nível
+      socioeconômico, e o vertical a taxa de abandono em porcentagem.
+    </p>
+    <details>
+      <summary>Ver os dados do gráfico em tabela</summary>
+      <p class="nota">Tabela limitada às 50 escolas de maior taxa de abandono na seleção atual.</p>
+      <table id="t-dispersao">
+        <caption>INSE e taxa de abandono por escola</caption>
+        <thead><tr><th scope="col">Escola</th><th scope="col">INSE</th><th scope="col">Abandono (%)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </div>
+</section>
+
+<section aria-labelledby="titulo-ranking">
+  <h2 id="titulo-ranking">Escolas por índice de risco</h2>
+  <table id="t-ranking">
+    <caption>
+      Escolas ordenadas do maior para o menor índice de risco.
+      O nível aparece sempre em texto, não apenas por cor.
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Escola</th>
+        <th scope="col">UF</th>
+        <th scope="col">Município</th>
+        <th scope="col">Ano</th>
+        <th scope="col">Índice</th>
+        <th scope="col">Nível de risco</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <nav class="paginacao" aria-label="Paginação do ranking">
+    <button type="button" id="pag-anterior">Página anterior</button>
+    <span id="pag-info">&ndash;</span>
+    <button type="button" id="pag-proxima">Próxima página</button>
+  </nav>
+</section>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {# Cores vindas de painel/cores.py, fonte unica de verdade da paleta. #}
+  <script id="paleta" type="application/json">{{ paleta_json|default:"{}" }}</script>
+  <script src="{% static 'painel/painel.js' %}"></script>
+{% endblock %}

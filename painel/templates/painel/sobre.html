@@ -1,0 +1,90 @@
+{% extends "painel/base.html" %}
+
+{% block titulo %}Metodologia | EducaAlerta{% endblock %}
+
+{% block conteudo %}
+<h1>Metodologia do índice de risco</h1>
+
+<p class="introducao">
+  Esta página existe para que ninguém use o índice sem saber como ele foi
+  construído, o que ele não mede e de onde vêm os dados.
+</p>
+
+<h2>Como o índice é calculado</h2>
+<p>
+  Para cada escola, quatro componentes são normalizados entre 0 e 1 dentro do
+  grupo formado pela unidade federativa e pelo ano, e combinados por soma
+  ponderada. O resultado vai de 0 a 1.
+</p>
+
+<div class="tabela-rolavel">
+  <table>
+    <caption>Componentes e pesos da versão <code>{{ versao_indice }}</code> do índice</caption>
+    <thead>
+      <tr><th scope="col">Componente</th><th scope="col" class="numero">Peso</th><th scope="col">Sentido</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Taxa de abandono</th><td class="numero">0,40</td><td>Maior valor eleva o risco</td></tr>
+      <tr><th scope="row">Taxa de reprovação</th><td class="numero">0,25</td><td>Maior valor eleva o risco</td></tr>
+      <tr><th scope="row">Distorção idade-série</th><td class="numero">0,20</td><td>Maior valor eleva o risco</td></tr>
+      <tr><th scope="row">INSE, nível socioeconômico</th><td class="numero">0,15</td><td>Invertido: nível menor eleva o risco</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  A classificação em três níveis usa tercis dentro de cada grupo de unidade
+  federativa e ano. Quando um componente está ausente para uma escola, o peso
+  dele é redistribuído proporcionalmente entre os demais, de modo que a escola
+  receba índice em vez de ser descartada.
+</p>
+
+<h2>Por que estes componentes</h2>
+<p>
+  Bowers, Sprott e Taff (2013) demonstram que indicadores simples e diretamente
+  observáveis pela escola, como histórico de reprovação e defasagem idade-série,
+  têm desempenho preditivo comparável ao de modelos estatísticos complexos, desde
+  que avaliados por precisão, sensibilidade e especificidade. Soares, Fernandes,
+  Nóbrega e Nicolella (2015) tratam o abandono como combinação de fatores
+  intraescolares e extraescolares, e não de causa única: por isso o índice reúne
+  indicadores de trajetória e um indicador de contexto socioeconômico.
+</p>
+
+<h2>Limites, ditos com clareza</h2>
+<ul>
+  <li>
+    <strong>Os pesos são uma escolha do grupo</strong>, informada pela literatura.
+    Não são valor consagrado na área, e alterá-los altera o ranking.
+  </li>
+  <li>
+    O índice descreve <strong>risco agregado da escola</strong>, nunca risco de um
+    estudante. Não há dado individual de estudante neste sistema.
+  </li>
+  <li>
+    Índice alto não significa má gestão. Pode refletir o contexto socioeconômico
+    do território onde a escola atua.
+  </li>
+  <li>
+    A comparação só é válida dentro do mesmo grupo de unidade federativa e ano,
+    porque a normalização acontece nesse recorte.
+  </li>
+</ul>
+
+<h2>Fontes de dados</h2>
+<ul>
+  <li><strong>INEP</strong>: indicadores educacionais de rendimento escolar, distorção idade-série e nível socioeconômico, por escola.</li>
+  <li><strong>IBGE</strong>: API de localidades, para municípios, unidades federativas e regiões.</li>
+</ul>
+<p>
+  A relação exata dos arquivos usados, com data de acesso e número de registros,
+  está em <code>docs/FONTES_DE_DADOS.md</code> no repositório do projeto.
+</p>
+
+<h2>Acessibilidade</h2>
+<p>
+  A interface segue as diretrizes WCAG 2.1 no nível AA. Em particular, o nível de
+  risco nunca é comunicado apenas por cor: a cor sempre acompanha o rótulo em
+  texto. Todo gráfico tem os mesmos dados disponíveis em tabela, e a navegação
+  funciona apenas com teclado.
+</p>
+{% endblock %}

@@ -1,0 +1,32 @@
+# EducaAlerta - dependencias
+# Versoes verificadas em 23/09/2026 com Python 3.14.3 local e 3.12 em producao.
+
+# Framework web
+Django==5.2.*
+gunicorn==23.*
+
+# Banco de dados
+psycopg[binary]==3.*
+dj-database-url==2.*
+
+# Arquivos estaticos em producao
+whitenoise==6.*
+
+# API REST propria e filtros
+djangorestframework==3.*
+django-filter==26.*
+
+# Consumo de API externa (IBGE)
+requests==2.*
+
+# ETL e analise de dados
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.5
+
+# Desenvolvimento local
+python-dotenv==1.*
+
+# Testes
+pytest>=8.3
+pytest-django>=4.9

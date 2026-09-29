@@ -1,0 +1,34 @@
+# Blueprint do Render: descreve a infraestrutura no proprio repositorio.
+# Versionar a infraestrutura conta como boa pratica de controle de versao.
+#
+# O banco NAO esta declarado aqui de proposito: o PostgreSQL gratuito do Render
+# expira 30 dias depois de criado, e o PI dura mais de tres meses. O banco fica
+# no Neon, e a connection string entra como DATABASE_URL no painel do Render.
+
+services:
+  - type: web
+    name: educaalerta
+    runtime: python
+    plan: free
+    # Mesma regiao do banco no Neon, de proposito. Aplicacao e banco em
+    # costas opostas dos EUA somariam cerca de 60 ms a cada consulta.
+    # Virginia (us-east-1) tambem e a regiao dos EUA mais proxima do Brasil.
+    region: virginia
+    branch: main
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn educaalerta.wsgi:application"
+    healthCheckPath: /saude/
+    envVars:
+      # Gerado pelo proprio Render; nunca escrever a chave no repositorio.
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      # sync: false significa valor cadastrado a mao no painel do Render.
+      # E aqui que entra a connection string do Neon.
+      - key: DATABASE_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: WEB_CONCURRENCY
+        value: "2"

@@ -1,0 +1,54 @@
+{% load static i18n %}{% get_current_language as LANGUAGE_CODE %}<!DOCTYPE html>
+{# lang explicito atende ao criterio 3.1.1 da WCAG 2.1 (Idioma da Pagina, nivel A):
+   e o que faz o leitor de tela pronunciar a pagina em portugues. #}
+<html lang="{{ LANGUAGE_CODE|default:'pt-br' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}EducaAlerta{% endblock %}</title>
+  <meta name="description" content="Painel acessível de risco de abandono e reprovação na educação básica, a partir de dados abertos do INEP.">
+  <link rel="stylesheet" href="{% static 'painel/painel.css' %}">
+</head>
+<body>
+  {# Link de pulo: primeiro item focavel da pagina, permite ir direto ao conteudo
+     sem percorrer os filtros a cada navegacao por teclado. #}
+  <a class="pular" href="#conteudo">Pular para o conteúdo principal</a>
+
+  <header class="topo">
+    <div class="faixa">
+      <p class="marca"><a href="{% url 'painel' %}">EducaAlerta</a></p>
+      <nav aria-label="Navegação principal">
+        <ul>
+          <li><a href="{% url 'painel' %}">Painel</a></li>
+          <li><a href="{% url 'sobre' %}">Metodologia</a></li>
+          <li><a href="/api/">API</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  {% if contem_amostra %}
+    {# Aviso deliberado. A base contem amostra de desenvolvimento, e nenhum numero
+       daqui pode ser apresentado como resultado do projeto. #}
+    <div class="aviso aviso-atencao" role="alert">
+      <strong>Atenção:</strong> esta base contém dados de amostra para desenvolvimento.
+      Os números exibidos não representam a realidade e não devem ser citados como resultado.
+    </div>
+  {% endif %}
+
+  <main id="conteudo">
+    {% block conteudo %}{% endblock %}
+  </main>
+
+  <footer class="pe">
+    <p>
+      Projeto Integrador II, Bacharelado em Ciência de Dados, Univesp, 2026.
+      Dados: indicadores educacionais do INEP e API de localidades do IBGE.
+    </p>
+    <p>Versão do índice de risco: <code>{{ versao_indice }}</code></p>
+  </footer>
+
+  <script src="{% static 'painel/vendor/chart.umd.min.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

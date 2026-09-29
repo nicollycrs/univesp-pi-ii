@@ -1,0 +1,227 @@
+/*
+  EducaAlerta - estilos do painel.
+
+  As cores hexadecimais repetem os valores de painel/cores.py, que e a fonte
+  unica de verdade da paleta. Existe teste automatizado que falha se divergirem.
+
+  Criterios da WCAG 2.1 atendidos aqui:
+    1.4.3 Contraste Minimo (AA)       texto com pelo menos 4,5:1
+    1.4.4 Redimensionar Texto (AA)    medidas em rem, legivel a 200%
+    1.4.10 Reflow (AA)                usavel a 320 px sem rolagem horizontal
+    1.4.11 Contraste Nao Textual (AA) bordas e controles com pelo menos 3:1
+    2.4.7 Foco Visivel (AA)           contorno de foco sempre presente
+*/
+
+:root {
+  --texto: #1F2937;
+  --texto-secundario: #4B5563;
+  --link: #1D4ED8;
+  --foco: #1D4ED8;
+  --borda: #6B7280;
+  --fundo: #FFFFFF;
+  --fundo-suave: #F3F4F6;
+
+  --alto-texto: #7F1D1D;
+  --alto-fundo: #FEE2E2;
+  --medio-texto: #713F12;
+  --medio-fundo: #FEF3C7;
+  --baixo-texto: #14532D;
+  --baixo-fundo: #DCFCE7;
+
+  --grafico-alto: #B91C1C;
+  --grafico-medio: #A16207;
+  --grafico-baixo: #15803D;
+  --grafico-neutro: #1D4ED8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* Medidas em rem para que o zoom de texto do navegador funcione (1.4.4). */
+  font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--texto);
+  background: var(--fundo);
+}
+
+/* ---------------------------------------------- foco visivel (criterio 2.4.7) */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* Link de pulo: escondido ate receber foco pelo teclado. */
+.pular {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--fundo);
+  color: var(--link);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  z-index: 100;
+}
+.pular:focus {
+  left: 0;
+  outline: 3px solid var(--foco);
+}
+
+a { color: var(--link); }
+a:hover { text-decoration: none; }
+
+/* -------------------------------------------------------------------- topo */
+.topo { border-bottom: 2px solid var(--borda); }
+.faixa {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.marca { font-size: 1.25rem; font-weight: 700; margin: 0; }
+.marca a { color: var(--texto); text-decoration: none; }
+.topo nav ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+main {
+  max-width: 72rem;
+  /* Gutter de 1rem nas laterais garante o reflow a 320 px (1.4.10). */
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+h1 { font-size: 1.75rem; line-height: 1.25; }
+h2 { font-size: 1.3rem; margin-top: 2.5rem; }
+h3 { font-size: 1.1rem; }
+.introducao { max-width: 62ch; color: var(--texto-secundario); }
+
+/* ------------------------------------------------------------------ avisos */
+.aviso {
+  border: 2px solid var(--borda);
+  border-left-width: 6px;
+  background: var(--fundo-suave);
+  padding: 0.75rem 1rem;
+  margin: 1rem auto;
+  max-width: 72rem;
+}
+.aviso-atencao {
+  border-color: var(--medio-texto);
+  background: var(--medio-fundo);
+  color: var(--medio-texto);
+}
+
+.status { color: var(--texto-secundario); font-style: italic; }
+
+/* ----------------------------------------------------------------- filtros */
+.filtros {
+  border: 1px solid var(--borda);
+  padding: 1rem;
+  margin-top: 1.5rem;
+}
+.filtros h2 { margin-top: 0; font-size: 1.1rem; }
+.campos { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+.campo { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+label { font-weight: 600; font-size: 0.9rem; }
+
+select, button {
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--borda);
+  background: var(--fundo);
+  color: var(--texto);
+  min-height: 2.75rem;
+}
+button {
+  background: var(--link);
+  color: var(--fundo);
+  border-color: var(--link);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+button:disabled { background: var(--fundo-suave); color: var(--texto-secundario); border-color: var(--borda); cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- cartoes */
+.cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+.cartao { border: 1px solid var(--borda); padding: 0.75rem 1rem; }
+.cartao dt { font-size: 0.85rem; color: var(--texto-secundario); }
+.cartao dd { margin: 0.25rem 0 0; font-size: 1.5rem; font-weight: 700; }
+
+/* --------------------------------------------------------------- graficos */
+.grafico-bloco { margin: 2rem 0; }
+.resumo-grafico { color: var(--texto-secundario); max-width: 62ch; font-size: 0.95rem; }
+.nota { font-size: 0.9rem; color: var(--texto-secundario); }
+details { margin-top: 0.5rem; }
+summary { cursor: pointer; font-weight: 600; padding: 0.25rem 0; }
+
+/* --------------------------------------------------------------- tabelas */
+table { border-collapse: collapse; width: 100%; margin-top: 0.75rem; }
+caption {
+  text-align: left;
+  color: var(--texto-secundario);
+  font-size: 0.9rem;
+  padding-bottom: 0.5rem;
+  max-width: 62ch;
+}
+th, td {
+  border: 1px solid var(--borda);
+  padding: 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--fundo-suave); }
+td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Em telas estreitas a tabela rola dentro do proprio bloco, e nao a pagina:
+   e assim que o criterio 1.4.10 Reflow e atendido sem perder o conteudo. */
+.tabela-rolavel { overflow-x: auto; }
+
+/* --------------------------------------------------- tarjas de nivel de risco */
+/* A cor nunca carrega a informacao sozinha: o texto do nivel esta dentro da
+   tarja. Criterio 1.4.1 Uso da Cor, nivel A. */
+.tarja {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid currentColor;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tarja-alto  { color: var(--alto-texto);  background: var(--alto-fundo); }
+.tarja-medio { color: var(--medio-texto); background: var(--medio-fundo); }
+.tarja-baixo { color: var(--baixo-texto); background: var(--baixo-fundo); }
+
+/* ------------------------------------------------------------- paginacao */
+.paginacao { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------------- pe */
+.pe {
+  border-top: 1px solid var(--borda);
+  padding: 1.5rem 1rem;
+  color: var(--texto-secundario);
+  font-size: 0.9rem;
+}
+.pe p { max-width: 72rem; margin: 0 auto 0.5rem; }
+
+/* ------------------------------------------------ preferencia de movimento */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
