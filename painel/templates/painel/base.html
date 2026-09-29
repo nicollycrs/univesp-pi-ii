@@ -1,6 +1,8 @@
 {% load static i18n %}{% get_current_language as LANGUAGE_CODE %}<!DOCTYPE html>
-{# lang explicito atende ao criterio 3.1.1 da WCAG 2.1 (Idioma da Pagina, nivel A):
-   e o que faz o leitor de tela pronunciar a pagina em portugues. #}
+{% comment %}
+  lang explicito atende ao criterio 3.1.1 da WCAG 2.1 (Idioma da Pagina, nivel A):
+  e o que faz o leitor de tela pronunciar a pagina em portugues.
+{% endcomment %}
 <html lang="{{ LANGUAGE_CODE|default:'pt-br' }}">
 <head>
   <meta charset="utf-8">
@@ -10,8 +12,10 @@
   <link rel="stylesheet" href="{% static 'painel/painel.css' %}">
 </head>
 <body>
-  {# Link de pulo: primeiro item focavel da pagina, permite ir direto ao conteudo
-     sem percorrer os filtros a cada navegacao por teclado. #}
+  {% comment %}
+    Link de pulo: primeiro item focavel da pagina, permite ir direto ao conteudo
+    sem percorrer os filtros a cada navegacao por teclado.
+  {% endcomment %}
   <a class="pular" href="#conteudo">Pular para o conteúdo principal</a>
 
   <header class="topo">
@@ -28,8 +32,10 @@
   </header>
 
   {% if contem_amostra %}
-    {# Aviso deliberado. A base contem amostra de desenvolvimento, e nenhum numero
-       daqui pode ser apresentado como resultado do projeto. #}
+    {% comment %}
+      Aviso deliberado. A base contem amostra de desenvolvimento, e nenhum numero
+      daqui pode ser apresentado como resultado do projeto.
+    {% endcomment %}
     <div class="aviso aviso-atencao" role="alert">
       <strong>Atenção:</strong> esta base contém dados de amostra para desenvolvimento.
       Os números exibidos não representam a realidade e não devem ser citados como resultado.

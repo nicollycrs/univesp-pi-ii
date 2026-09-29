@@ -54,8 +54,10 @@
   </div>
 </form>
 
-{# Regiao de status anunciada por leitor de tela quando o conteudo muda por
-   JavaScript, sem exigir que a pessoa procure a mudanca na tela. #}
+{% comment %}
+  Regiao de status anunciada por leitor de tela quando o conteudo muda por
+  JavaScript, sem exigir que a pessoa procure a mudanca na tela.
+{% endcomment %}
 <p id="status" class="status" role="status" aria-live="polite">Carregando dados.</p>
 
 <section aria-labelledby="titulo-resumo">
@@ -73,8 +75,10 @@
 
   <div class="grafico-bloco">
     <h3 id="titulo-g1">Escolas por nível de risco</h3>
-    {# O grafico tem role img e um resumo textual. Alem disso, os mesmos dados
-       aparecem em tabela abaixo: criterio 1.1.1 (Conteudo Nao Textual, nivel A). #}
+    {% comment %}
+      O grafico tem role img e um resumo textual. Alem disso, os mesmos dados
+      aparecem em tabela abaixo: criterio 1.1.1 (Conteudo Nao Textual, nivel A).
+    {% endcomment %}
     <canvas id="g-classes" height="220" role="img" aria-labelledby="titulo-g1" aria-describedby="resumo-g1"></canvas>
     <p id="resumo-g1" class="resumo-grafico">Distribuição da quantidade de escolas em cada nível de risco.</p>
     <details>

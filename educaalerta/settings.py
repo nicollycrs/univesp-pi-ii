@@ -142,6 +142,20 @@ if TESTANDO:
         }
     }
 elif DATABASE_URL:
+    # Erro comum: colar so o host em vez da string de conexao inteira. Sem esta
+    # verificacao, o dj_database_url falha com "No support for ''", que nao diz
+    # a ninguem o que fazer. A mensagem abaixo diz.
+    if "://" not in DATABASE_URL:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "DATABASE_URL nao e uma string de conexao valida: falta o esquema. "
+            f"O valor definido tem {len(DATABASE_URL)} caracteres e nao contem '://'. "
+            "Um erro comum e colar apenas o host. O valor precisa ser a string "
+            "inteira, no formato "
+            "postgresql://usuario:senha@host.neon.tech/neondb?sslmode=require"
+        )
+
     # conn_max_age mantem a conexao aberta por 10 min. Importante porque o computo
     # do Neon hiberna, e reabrir conexao a cada requisicao custa caro.
     _config = dj_database_url.parse(

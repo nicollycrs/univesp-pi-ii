@@ -272,3 +272,51 @@ class TestEstaticosProntosParaDeploy:
         base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
         assert "vendor/chart.umd.min.js" in base
         assert "cdn." not in base and "unpkg" not in base
+
+
+class TestRenderizacaoLimpa:
+    """
+    Regressao de um erro que chegou a producao em 29/09/2026.
+
+    Comentario de template do Django, `{# ... #}`, so funciona em UMA linha.
+    Escrito em duas, o Django nao o reconhece e imprime o texto na pagina. Cinco
+    comentarios de acessibilidade apareciam como texto no topo do painel, no ar.
+
+    Os testes anteriores liam o codigo-fonte dos templates e por isso nao viam
+    nada de errado. Este renderiza de verdade e confere a saida, que e o unico
+    lugar onde esse defeito aparece.
+    """
+
+    ROTAS = ["/", "/sobre/"]
+
+    def _render(self, client, rota):
+        resposta = client.get(rota)
+        assert resposta.status_code == 200, f"{rota} respondeu {resposta.status_code}"
+        return resposta.content.decode()
+
+    @pytest.mark.parametrize("rota", ROTAS)
+    def test_nenhuma_sintaxe_de_template_vaza_para_a_pagina(self, client, db, escolas, rota):
+        html = self._render(client, rota)
+        vazamentos = [
+            marca
+            for marca in ("{#", "#}", "{% comment %}", "{% endcomment %}", "{% if", "{% for", "{{ ")
+            if marca in html
+        ]
+        assert not vazamentos, (
+            f"Sintaxe de template apareceu no HTML renderizado de {rota}: {vazamentos}. "
+            "Comentario {# #} do Django so vale em uma linha; use {% comment %} para varias."
+        )
+
+    def test_detalhe_da_escola_tambem_renderiza_limpo(self, client, db, escolas):
+        html = self._render(client, f"/escola/{escolas[0].pk}/")
+        assert "{#" not in html and "{%" not in html
+
+    @pytest.mark.parametrize("rota", ROTAS)
+    def test_pagina_nao_mostra_texto_de_comentario_de_codigo(self, client, db, escolas, rota):
+        """
+        Os comentarios do projeto explicam criterios da WCAG. Se algum vazar, o
+        texto tecnico aparece para o usuario final.
+        """
+        html = self._render(client, rota)
+        for frase in ("criterio 3.1.1", "Link de pulo:", "Regiao de status", "Aviso deliberado"):
+            assert frase not in html, f"Texto de comentario visivel em {rota}: {frase!r}"
