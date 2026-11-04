@@ -23,6 +23,10 @@ requests==2.*
 pandas>=2.2
 numpy>=1.26
 scikit-learn>=1.5
+# Leitura das planilhas xlsx do INEP, usada por etl/rendimento.py.
+# Faltava aqui: funcionava na maquina de quem ja tinha o pacote no ambiente e
+# quebrava em instalacao limpa. So apareceu quando um teste passou a importa-la.
+openpyxl>=3.1
 
 # Desenvolvimento local
 python-dotenv==1.*

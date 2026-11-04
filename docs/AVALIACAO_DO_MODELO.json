@@ -1,0 +1,9 @@
+{
+  "modelo": "Regressão logística",
+  "ano_atributos": 2023,
+  "ano_alvo": 2024,
+  "sensibilidade": 0.5654,
+  "especificidade": 0.7413,
+  "precisao": 0.4292,
+  "auc": 0.7093
+}

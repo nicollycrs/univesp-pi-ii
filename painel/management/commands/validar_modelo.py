@@ -17,6 +17,7 @@ O CSV do ano observado nao precisa estar carregado no banco: a validacao le o
 arquivo e cruza com as previsoes ja gravadas.
 """
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -102,9 +103,20 @@ class Command(BaseCommand):
             self.stdout.write(f"    precisao      : {aval.precisao:.3f}")
             self.stdout.write(f"    AUC ROC       : {aval.auc:.3f}")
 
+        # Metricas da particao de teste lidas do arquivo gerado pelo treino.
+        # Estavam fixas no codigo, com os numeros da floresta aleatoria; quando
+        # a regra de desempate passou a escolher a regressao logistica, o
+        # relatorio comparou o ano observado com o modelo errado, sem avisar.
+        sidecar = Path("docs/AVALIACAO_DO_MODELO.json")
+        if not sidecar.exists():
+            raise CommandError(
+                f"{sidecar} nao encontrado. Rode antes: python manage.py treinar_modelo"
+            )
+        treino = json.loads(sidecar.read_text(encoding="utf-8"))
+
         destino = Path(opcoes["relatorio"])
         self._gravar(destino, ano_base, ano_observado, observado, previsto,
-                     cruzamento, resultados)
+                     cruzamento, resultados, treino)
         self.stdout.write(f"\nRelatorio gravado em {destino}")
 
     @staticmethod
@@ -118,7 +130,7 @@ class Command(BaseCommand):
         return f"{valor:.{casas}f}".replace(".", ",")
 
     def _gravar(self, destino, ano_base, ano_obs, observado, previsto,
-                cruzamento, resultados):
+                cruzamento, resultados, treino):
         principal, prop_principal = resultados["por posto"]
         literal, prop_literal = resultados["regra literal"]
         vn, fp, fn, vp = principal.matriz.ravel()
@@ -148,12 +160,16 @@ class Command(BaseCommand):
             "",
             "## Resultado",
             "",
-            "| Métrica | Teste do treino | **Observado em " + str(ano_obs) + "** |",
+            f"| Métrica | Teste do treino ({treino['modelo']}) | "
+            f"**Observado em {ano_obs}** |",
             "|---|---|---|",
-            f"| Sensibilidade | 0,581 | **{self._n(principal.sensibilidade)}** |",
-            f"| Especificidade | 0,735 | **{self._n(principal.especificidade)}** |",
-            f"| Precisão | 0,430 | **{self._n(principal.precisao)}** |",
-            f"| AUC ROC | 0,726 | **{self._n(principal.auc)}** |",
+            f"| Sensibilidade | {self._n(treino['sensibilidade'])} | "
+            f"**{self._n(principal.sensibilidade)}** |",
+            f"| Especificidade | {self._n(treino['especificidade'])} | "
+            f"**{self._n(principal.especificidade)}** |",
+            f"| Precisão | {self._n(treino['precisao'])} | "
+            f"**{self._n(principal.precisao)}** |",
+            f"| AUC ROC | {self._n(treino['auc'])} | **{self._n(principal.auc)}** |",
             "",
             "```",
             f"verdadeiro negativo {vn:>6}   falso positivo {fp:>6}",

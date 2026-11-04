@@ -26,39 +26,38 @@ de 74% dos casos e não encontraria nenhuma escola em risco.
 
 | Modelo | Sensibilidade | Especificidade | Precisão | F1 | AUC ROC |
 |---|---|---|---|---|---|
-| Regressão logística | 0.558 | 0.748 | 0.432 | 0.487 | 0.718 |
-| Floresta aleatória | 0.581 | 0.735 | 0.430 | 0.494 | 0.726 |
+| Regressão logística | 0.565 | 0.741 | 0.429 | 0.488 | 0.709 |
+| Floresta aleatória | 0.581 | 0.731 | 0.426 | 0.492 | 0.722 |
 
-**Modelo escolhido: Floresta aleatória.** O critério foi a maior sensibilidade.
-Encontrar a escola que vai piorar importa mais do que evitar o alarme falso:
-o custo de olhar uma escola que estava bem é baixo; o de não olhar uma que
-piorou, alto.
+**Modelo escolhido: Regressão logística.**
+
+A sensibilidade mais alta foi a de Floresta aleatória (0.581 contra 0.565), mas a diferença de 0.016 cabe dentro da tolerância de 0.02 adotada pelo projeto. Em uma única divisão entre treino e teste, diferença dessa ordem é ruído amostral, não desempenho. Havendo empate técnico, vence o modelo interpretável, cujos coeficientes podem ser lidos e defendidos.
 
 ### Matriz de confusão do modelo escolhido
 
 ```
-Floresta aleatória
-  sensibilidade (recall):  0.581
-  especificidade:          0.735
-  precisao:                0.430
-  F1:                      0.494
-  AUC ROC:                 0.726
+Regressão logística
+  sensibilidade (recall):  0.565
+  especificidade:          0.741
+  precisao:                0.429
+  F1:                      0.488
+  AUC ROC:                 0.709
   matriz de confusao:
-    verdadeiro negativo   2715   falso positivo    977
-    falso negativo         532   verdadeiro positivo    738
+    verdadeiro negativo   2737   falso positivo    955
+    falso negativo         552   verdadeiro positivo    718
 ```
 
 ### Contribuição de cada atributo
 
-Importância de atributo da floresta aleatória. É sempre positiva e mede o quanto o atributo foi usado para separar os casos, **não** a direção do efeito. Não se lê como coeficiente de regressão.
+Coeficientes da regressão logística, sobre atributos padronizados. O **sinal** diz a direção do efeito e a magnitude diz a força.
 
-| Atributo | Importância |
+| Atributo | Coeficiente |
 |---|---|
-| taxa_abandono | 0.4562 |
-| distorcao_idade_serie | 0.2635 |
-| taxa_reprovacao | 0.1546 |
-| contexto_socioeconomico | 0.1151 |
-| rural | 0.0106 |
+| taxa_abandono | +0.6899 |
+| distorcao_idade_serie | +0.2208 |
+| taxa_reprovacao | +0.1168 |
+| rural | -0.0895 |
+| contexto_socioeconomico | +0.0852 |
 
 ## Limites declarados
 

@@ -9,6 +9,7 @@ Uso:
     python manage.py treinar_modelo --ano-atributos 2023 --ano-alvo 2024
 """
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -36,7 +37,19 @@ class Command(BaseCommand):
         ano_atr, ano_alvo = opcoes["ano_atributos"], opcoes["ano_alvo"]
 
         registros = list(
-            IndicadorAnual.objects.select_related("escola").values(
+            # order_by por chave UNICA, e nao a ordenacao padrao do model.
+            #
+            # O Meta ordena por (-ano, escola__nome), e 1.190 escolas dividem
+            # nome com outra: "EE DE ENSINO MEDIO" aparece 18 vezes. Empate na
+            # chave de ordenacao e resolvido de forma diferente por cada banco,
+            # entao a ordem das linhas mudava entre o SQLite local e o
+            # PostgreSQL de producao. Como train_test_split sorteia a partir da
+            # ordem recebida, o mesmo codigo com a mesma semente treinava
+            # modelos ligeiramente diferentes, e as metricas do relatorio nao
+            # fechavam entre os dois ambientes.
+            IndicadorAnual.objects.select_related("escola")
+            .order_by("escola_id", "ano")
+            .values(
                 "escola_id", "ano", "taxa_abandono", "taxa_reprovacao",
                 "escola__municipio__salario_medio",
                 "distorcao_idade_serie", "inse", "escola__uf", "escola__localizacao",
@@ -84,6 +97,29 @@ class Command(BaseCommand):
         caminho = Path(opcoes["relatorio"])
         self._gravar_relatorio(caminho, base, avaliacoes, aval_melhor, ano_atr, ano_alvo)
         self.stdout.write(f"Avaliacao registrada em {caminho}")
+
+        # Metricas em formato legivel por maquina. O validar_modelo compara o
+        # ano observado com a particao de teste, e antes trazia esses numeros
+        # fixos no codigo: quando o modelo escolhido mudou, a comparacao passou
+        # a confrontar o modelo errado, em silencio.
+        sidecar = caminho.with_suffix(".json")
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "modelo": aval_melhor.nome,
+                    "ano_atributos": ano_atr,
+                    "ano_alvo": ano_alvo,
+                    "sensibilidade": round(aval_melhor.sensibilidade, 4),
+                    "especificidade": round(aval_melhor.especificidade, 4),
+                    "precisao": round(aval_melhor.precisao, 4),
+                    "auc": round(aval_melhor.auc, 4),
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        self.stdout.write(f"Metricas em {sidecar}")
 
         if opcoes["nao_gravar"]:
             self.stdout.write(self.style.WARNING("Previsoes nao gravadas (--nao-gravar)."))
@@ -173,6 +209,38 @@ class Command(BaseCommand):
             )
         )
 
+    @staticmethod
+    def _explicar_escolha(melhor, avaliacoes):
+        """
+        Diz o que de fato decidiu a escolha.
+
+        O texto era fixo em "o criterio foi a maior sensibilidade", o que fica
+        falso quando quem decide e a regra de desempate: os dois modelos ficam
+        dentro da tolerancia e vence o interpretavel, que pode ter a
+        sensibilidade MENOR. Afirmar um criterio errado em relatorio e pior do
+        que nao explicar.
+        """
+        from etl import modelo as M
+
+        maior = max(a.sensibilidade for a in avaliacoes)
+        if melhor.sensibilidade >= maior:
+            return (
+                "O critério foi a maior sensibilidade. Encontrar a escola que vai "
+                "piorar importa mais do que evitar o alarme falso: o custo de olhar "
+                "uma escola que estava bem é baixo; o de não olhar uma que piorou, "
+                "alto."
+            )
+        vencedor = max(avaliacoes, key=lambda a: a.sensibilidade)
+        return (
+            f"A sensibilidade mais alta foi a de {vencedor.nome} "
+            f"({vencedor.sensibilidade:.3f} contra {melhor.sensibilidade:.3f}), mas a "
+            f"diferença de {maior - melhor.sensibilidade:.3f} cabe dentro da "
+            f"tolerância de {M.TOLERANCIA_SENSIBILIDADE:.2f} adotada pelo projeto. "
+            "Em uma única divisão entre treino e teste, diferença dessa ordem é "
+            "ruído amostral, não desempenho. Havendo empate técnico, vence o modelo "
+            "interpretável, cujos coeficientes podem ser lidos e defendidos."
+        )
+
     def _gravar_relatorio(self, caminho, base, avaliacoes, melhor, ano_atr, ano_alvo):
         from etl import modelo as M
 
@@ -215,10 +283,9 @@ class Command(BaseCommand):
             )
         linhas += [
             "",
-            f"**Modelo escolhido: {melhor.nome}.** O critério foi a maior sensibilidade.",
-            "Encontrar a escola que vai piorar importa mais do que evitar o alarme falso:",
-            "o custo de olhar uma escola que estava bem é baixo; o de não olhar uma que",
-            "piorou, alto.",
+            f"**Modelo escolhido: {melhor.nome}.**",
+            "",
+            self._explicar_escolha(melhor, avaliacoes),
             "",
             "### Matriz de confusão do modelo escolhido",
             "",

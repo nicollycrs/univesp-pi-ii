@@ -174,3 +174,107 @@ class TestPrevisoesSaoRetrato:
             / "painel" / "management" / "commands" / "treinar_modelo.py"
         ).read_text(encoding="utf-8")
         assert 'IndiceRisco.objects.filter(versao=M.VERSAO).delete()' in fonte
+
+
+class TestDependenciasDeclaradas:
+    """
+    Todo pacote de terceiros que o projeto importa precisa estar no
+    requirements.txt.
+
+    Regressao de uma falha de CI em 04/11/2026: `openpyxl` era importado por
+    etl/rendimento.py desde o inicio e nunca foi declarado. Na maquina de
+    desenvolvimento o pacote ja estava no ambiente, entao nada acusava; o CI,
+    que instala do zero, quebrou assim que um teste passou a importa-lo. Quem
+    clonasse o repositorio e rodasse o ETL teria o mesmo erro.
+    """
+
+    def test_todo_import_de_terceiro_esta_no_requirements(self):
+        import ast
+        import sys
+        from pathlib import Path
+
+        raiz = Path(__file__).resolve().parent.parent
+        requisitos = (raiz / "requirements.txt").read_text(encoding="utf-8").lower()
+
+        # Nomes de import que diferem do nome do pacote no PyPI.
+        equivalentes = {
+            "sklearn": "scikit-learn",
+            "dotenv": "python-dotenv",
+            "rest_framework": "djangorestframework",
+            "django_filters": "django-filter",
+            "psycopg": "psycopg",
+            "dj_database_url": "dj-database-url",
+            "yaml": "pyyaml",
+        }
+        locais = {"painel", "etl", "educaalerta", "tests"}
+
+        faltando = set()
+        for arquivo in list((raiz / "painel").rglob("*.py")) + list(
+            (raiz / "etl").rglob("*.py")
+        ):
+            arvore = ast.parse(arquivo.read_text(encoding="utf-8"), str(arquivo))
+            for no in ast.walk(arvore):
+                if isinstance(no, ast.Import):
+                    nomes = [a.name.split(".")[0] for a in no.names]
+                elif isinstance(no, ast.ImportFrom):
+                    nomes = [(no.module or "").split(".")[0]] if no.level == 0 else []
+                else:
+                    continue
+                for nome in nomes:
+                    if not nome or nome in locais or nome in sys.stdlib_module_names:
+                        continue
+                    pacote = equivalentes.get(nome, nome)
+                    if pacote.lower() not in requisitos:
+                        faltando.add(f"{nome} (pacote {pacote})")
+
+        assert not faltando, (
+            "Importados pelo projeto mas ausentes do requirements.txt: "
+            f"{sorted(faltando)}. Em instalacao limpa isso quebra."
+        )
+
+
+class TestTreinoReprodutivel:
+    """
+    O treino precisa dar o mesmo resultado em qualquer banco.
+
+    Regressao de uma divergencia encontrada em 04/11/2026: as metricas do
+    relatorio nao fechavam entre o SQLite local e o PostgreSQL de producao, na
+    terceira casa decimal. A causa nao era o modelo, e sim a ORDEM das linhas.
+    O Meta de IndicadorAnual ordena por (-ano, escola__nome), e 1.190 escolas
+    dividem nome com outra; empate nessa chave cada banco desfaz de um jeito.
+    Como train_test_split sorteia a partir da ordem recebida, a mesma semente
+    produzia particoes diferentes.
+    """
+
+    def test_consulta_do_treino_ordena_por_chave_unica(self):
+        from pathlib import Path
+
+        fonte = (
+            Path(__file__).resolve().parent.parent
+            / "painel" / "management" / "commands" / "treinar_modelo.py"
+        ).read_text(encoding="utf-8")
+        assert '.order_by("escola_id", "ano")' in fonte, (
+            "Sem ordenacao por chave unica, a ordem das linhas depende do banco "
+            "e o treino deixa de ser reprodutivel."
+        )
+
+    def test_ordenacao_padrao_do_model_tem_empate(self, db, escolas):
+        """
+        Mostra por que a ordenacao padrao nao serve: ela nao e um criterio
+        unico. Se um dia passar a ser, este teste avisa que a protecao acima
+        pode ser revista.
+        """
+        from django.db.models import Count
+
+        from painel.models import Escola, IndicadorAnual
+
+        Escola.objects.create(
+            co_entidade=9999, nome=escolas[0].nome, uf=escolas[0].uf,
+            municipio=escolas[0].municipio, rede=escolas[0].rede,
+            localizacao=escolas[0].localizacao,
+        )
+        repetidos = (
+            Escola.objects.values("nome").annotate(n=Count("*")).filter(n__gt=1)
+        )
+        assert repetidos.exists()
+        assert IndicadorAnual._meta.ordering == ["-ano", "escola__nome"]

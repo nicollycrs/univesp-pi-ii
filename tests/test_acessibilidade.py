@@ -380,8 +380,8 @@ class TestMetodologiaFielAoCodigo:
         """
         html = self._html(client)
         assert "conferido contra a realidade" in html
-        assert "19.941 escolas" in html
-        assert "0,561" in html
+        assert "19.889 escolas" in html
+        assert "0,598" in html
 
     def test_substituicao_do_inse_e_declarada(self, client, db):
         """

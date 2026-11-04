@@ -256,20 +256,21 @@ fato aconteceu em **19.941 escolas**:
 
 | Métrica | Teste do treino | **Observado em 2025** |
 |---|---|---|
-| Sensibilidade | 0,581 | **0,561** |
-| Especificidade | 0,735 | **0,744** |
-| AUC ROC | 0,726 | **0,696** |
+| Sensibilidade | 0,565 | **0,598** |
+| Especificidade | 0,741 | **0,756** |
+| AUC ROC | 0,709 | **0,703** |
 
-**O desempenho se sustentou fora do tempo de treino.** É uma validação mais
-exigente que a partição de teste: ali as linhas vinham do mesmo par de anos;
-aqui o ano observado é posterior a tudo que o modelo viu.
+**O desempenho se sustentou fora do tempo de treino**, com a sensibilidade até
+maior do que a medida no teste. É uma validação mais exigente que a partição de
+teste: ali as linhas vinham do mesmo par de anos; aqui o ano observado é
+posterior a tudo que o modelo viu.
 
 Um cuidado mudou o número e está documentado: o abandono caiu em 2025, a média
 foi de 3,54% para 2,58%, e as escolas com abandono zero subiram de 29,9% para
 38,5%. Com a distribuição comprimida, o corte do quartil passou a cair sobre
 valores empatados, e em duas UFs virou zero. A regra literal promoveria a
 positiva toda escola sem abandono nenhum, inflando os positivos para 33,7% e
-derrubando a AUC aparente para 0,626. A validação adota o corte **por posto**,
+derrubando a AUC aparente para 0,610. A validação adota o corte **por posto**,
 que toma sempre o quarto superior. As duas leituras estão em
 [docs/VALIDACAO_2025.md](docs/VALIDACAO_2025.md).
 
@@ -288,11 +289,14 @@ prevalece o modelo interpretável.
 
 | Modelo | Sensibilidade | Especificidade | AUC ROC |
 |---|---|---|---|
-| **Floresta aleatória** (escolhida) | 0,581 | 0,735 | 0,726 |
-| Regressão logística | 0,558 | 0,748 | 0,718 |
+| **Regressão logística** (escolhida) | 0,565 | 0,741 | 0,709 |
+| Floresta aleatória | 0,581 | 0,731 | 0,722 |
 
-A entrada do contexto socioeconômico melhorou o modelo: a sensibilidade subiu de
-0,562 para 0,581 e a AUC de 0,722 para 0,726.
+A floresta tem sensibilidade maior, mas a diferença de 0,016 cabe na tolerância
+de 0,02 do projeto: em uma única divisão treino e teste isso é ruído amostral.
+Havendo empate técnico, vence o modelo interpretável. O relatório gerado diz
+qual dos dois critérios decidiu em cada execução, em vez de afirmar sempre o
+mesmo.
 
 A ordem de importância dos atributos discorda dos pesos escolhidos a priori para
 o índice de regras, e esse desacordo é um resultado:
