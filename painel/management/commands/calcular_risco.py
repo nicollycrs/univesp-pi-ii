@@ -24,7 +24,7 @@ class Command(BaseCommand):
         parser.add_argument("--uf", help="Calcula so esta unidade federativa.")
 
     def handle(self, *args, **opcoes):
-        qs = IndicadorAnual.objects.select_related("escola")
+        qs = IndicadorAnual.objects.select_related("escola", "escola__municipio")
         if opcoes.get("ano"):
             qs = qs.filter(ano=opcoes["ano"])
         if opcoes.get("uf"):
@@ -38,6 +38,12 @@ class Command(BaseCommand):
                 "taxa_abandono": i.taxa_abandono,
                 "taxa_reprovacao": i.taxa_reprovacao,
                 "distorcao_idade_serie": i.distorcao_idade_serie,
+                # Contexto socioeconomico do municipio da escola. Vem do
+                # municipio, e nao do indicador anual, porque a fonte e
+                # municipal: ver painel/risco.py para a troca em relacao ao INSE.
+                "contexto_socioeconomico": (
+                    i.escola.municipio.salario_medio if i.escola.municipio_id else None
+                ),
                 "inse": i.inse,
             }
             for i in qs
@@ -61,6 +67,7 @@ class Command(BaseCommand):
                 versao=r["versao"],
                 score=r["score"],
                 classe=r["classe"],
+                detalhes=r.get("detalhes"),
             )
             for r in calculados
             if r["score"] is not None
@@ -71,7 +78,7 @@ class Command(BaseCommand):
                 objetos,
                 batch_size=2000,
                 update_conflicts=True,
-                update_fields=["score", "classe"],
+                update_fields=["score", "classe", "detalhes"],
                 unique_fields=["escola", "ano", "versao"],
             )
         gravados = len(objetos)

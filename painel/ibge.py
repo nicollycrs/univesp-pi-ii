@@ -129,3 +129,109 @@ def municipios_em_cache(uf=None):
     if uf:
         qs = qs.filter(uf=uf.upper())
     return qs
+
+
+# ---------------------------------------------------------------- socioeconomico
+#
+# Segunda API do IBGE consumida pelo projeto, a de indicadores do panorama
+# municipal (a mesma que alimenta cidades.ibge.gov.br).
+#
+# Por que ela existe aqui. O indice de risco reserva 0,15 do peso ao contexto
+# socioeconomico. A fonte pretendida era o INSE do INEP, que nao e publicado de
+# forma cruzavel: ele esta nos microdados do Saeb 2023, mas com os codigos de
+# escola mascarados por LGPD, o que impede a juncao pelo codigo do Censo. O
+# salario medio municipal ocupa essa vaga como proxy territorial, e e nomeado
+# como tal em todo lugar: nunca como INSE.
+BASE_INDICADORES = "https://servicodados.ibge.gov.br/api/v1/pesquisas/indicadores"
+
+# Salario medio mensal dos trabalhadores formais, em salarios minimos.
+INDICADOR_SALARIO_MEDIO = 29765
+
+# A API devolve o codigo do municipio com 6 digitos, sem o digito verificador,
+# enquanto o projeto guarda os 7 digitos do IBGE. A conversao e so truncar.
+def _codigo_curto(codigo_ibge: str) -> str:
+    return str(codigo_ibge)[:6]
+
+
+def buscar_salario_medio(codigos_ibge, timeout=None, tamanho_lote=200):
+    """
+    Busca o salario medio mensal de cada municipio.
+
+    Recebe codigos de 7 digitos e devolve {codigo_7_digitos: (valor, ano)}.
+    Municipio sem dado publicado simplesmente nao aparece no resultado, em vez
+    de entrar com zero: zero seria um municipio sem nenhuma renda, o que falseia
+    o indice para baixo.
+    """
+    timeout = timeout or getattr(settings, "IBGE_TIMEOUT", 20)
+    codigos = [str(c) for c in codigos_ibge]
+    por_curto = {_codigo_curto(c): c for c in codigos}
+    resultado = {}
+
+    for inicio in range(0, len(codigos), tamanho_lote):
+        lote = codigos[inicio : inicio + tamanho_lote]
+        alvo = "|".join(_codigo_curto(c) for c in lote)
+        url = f"{BASE_INDICADORES}/{INDICADOR_SALARIO_MEDIO}/resultados/{alvo}"
+        try:
+            resposta = requests.get(url, timeout=timeout)
+            resposta.raise_for_status()
+            dados = resposta.json()
+        except (requests.RequestException, ValueError) as erro:
+            raise ErroIBGE(f"Falha ao consultar o IBGE em {url}: {erro}") from erro
+
+        for indicador in dados:
+            for serie in indicador.get("res", []):
+                curto = str(serie.get("localidade", ""))
+                completo = por_curto.get(curto)
+                if not completo:
+                    continue
+                valores = {
+                    ano: v
+                    for ano, v in (serie.get("res") or {}).items()
+                    if v not in (None, "", "-", "..", "...")
+                }
+                if not valores:
+                    continue
+                ano = max(valores)
+                try:
+                    resultado[completo] = (float(valores[ano]), int(ano))
+                except (TypeError, ValueError):
+                    continue
+
+    return resultado
+
+
+def sincronizar_salario_medio(uf=None):
+    """
+    Preenche o salario medio dos municipios no banco. Idempotente.
+
+    Devolve (preenchidos, sem_dado).
+    """
+    from painel.models import Municipio
+
+    qs = Municipio.objects.all()
+    if uf:
+        qs = qs.filter(uf=uf.upper())
+    codigos = list(qs.values_list("codigo_ibge", flat=True))
+    if not codigos:
+        return 0, 0
+
+    valores = buscar_salario_medio(codigos)
+
+    objetos = []
+    for municipio in qs:
+        par = valores.get(municipio.codigo_ibge)
+        if not par:
+            continue
+        municipio.salario_medio, municipio.salario_medio_ano = par
+        objetos.append(municipio)
+
+    Municipio.objects.bulk_update(
+        objetos, ["salario_medio", "salario_medio_ano"], batch_size=1000
+    )
+
+    logger.info(
+        "Salario medio sincronizado: %s preenchidos, %s sem dado",
+        len(objetos),
+        len(codigos) - len(objetos),
+    )
+    return len(objetos), len(codigos) - len(objetos)

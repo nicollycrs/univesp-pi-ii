@@ -104,6 +104,19 @@ def mapa_etapa(etapa: str = "MED") -> dict:
     }
 
 
+def mapa_distorcao(etapa: str = "MED") -> dict:
+    """
+    Mapa da coluna de distorcao idade-serie para uma etapa de ensino.
+
+    A planilha TDI do INEP usa outra convencao de nome: o codigo e
+    {ETAPA}_CAT_0 para o total da etapa, por exemplo MED_CAT_0 no ensino medio,
+    enquanto as series individuais recebem MED_01_CAT_0 e seguintes. Conferido
+    em TDI_ESCOLAS_2023.xlsx, linha 9 do cabecalho, em 19/10/2026.
+    """
+    e = etapa.strip().lower()
+    return {f"{e}cat0": "distorcao_idade_serie"}
+
+
 MAPA_REDE = {
     "estadual": "estadual",
     "2": "estadual",

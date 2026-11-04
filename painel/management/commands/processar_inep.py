@@ -17,7 +17,7 @@ import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 
 from etl import rendimento
-from etl.transformar import CANONICAS, mapa_etapa, transformar
+from etl.transformar import CANONICAS, mapa_distorcao, mapa_etapa, transformar
 
 SAIDA_PADRAO = "dados_processados/indicadores.csv"
 
@@ -61,11 +61,41 @@ class Command(BaseCommand):
 
             self.stdout.write(f"Lendo {caminho.name} (etapa {etapa})...")
             cru = rendimento.ler(caminho, etapa=etapa)
-            self.stdout.write(f"  {len(cru)} linhas lidas da planilha")
+            self.stdout.write(f"  {len(cru)} linhas lidas da planilha de rendimento")
 
-            limpo, rel = transformar(
-                cru, ano=ano, mapa=mapa_etapa(etapa), redes=redes
-            )
+            mapa = dict(mapa_etapa(etapa))
+
+            # A distorcao idade-serie vem de outra planilha do INEP, com a mesma
+            # estrutura mas codigos de coluna proprios. Quando o arquivo existe,
+            # e unida ao rendimento pelo codigo da escola; quando nao existe, o
+            # indice simplesmente redistribui o peso desse componente.
+            caminho_tdi = rendimento.caminho_distorcao(ano)
+            if caminho_tdi.exists():
+                mapa_tdi = mapa_distorcao(etapa)
+                cru_tdi = rendimento.ler(caminho_tdi, etapa=etapa, mapa=mapa_tdi)
+                coluna = next(
+                    c for c in cru_tdi.columns
+                    if c not in ("CO_ENTIDADE", "NO_ENTIDADE", "SG_UF", "CO_MUNICIPIO",
+                                 "NO_DEPENDENCIA", "NO_CATEGORIA", "NU_ANO_CENSO")
+                )
+                antes = len(cru)
+                cru = cru.merge(
+                    cru_tdi[["CO_ENTIDADE", coluna]], on="CO_ENTIDADE", how="left"
+                )
+                mapa.update(mapa_tdi)
+                self.stdout.write(
+                    f"  {len(cru_tdi)} linhas de distorcao idade-serie unidas "
+                    f"({antes} linhas de rendimento preservadas)"
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  distorcao idade-serie nao encontrada em {caminho_tdi}; "
+                        "o indice vai redistribuir o peso desse componente"
+                    )
+                )
+
+            limpo, rel = transformar(cru, ano=ano, mapa=mapa, redes=redes)
             self.stdout.write(f"  {len(limpo)} linhas validas apos a limpeza")
             partes.append(limpo)
             relatorios.append((ano, rel))

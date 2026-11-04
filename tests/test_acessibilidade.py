@@ -138,8 +138,13 @@ class TestTemplates:
         assert 'scope="col"' in html
 
     def test_tabelas_tem_caption(self):
+        """
+        Conta `<caption` sem o fecho porque a legenda do ranking leva um id: ela
+        e reescrita pelo JavaScript quando um grupo da matriz esta selecionado,
+        ja que a ordenacao muda.
+        """
         html = (TEMPLATES / "painel.html").read_text(encoding="utf-8")
-        assert html.count("<caption>") >= html.count("<table")
+        assert html.count("<caption") >= html.count("<table")
 
 
 class TestUsoDaCor:
@@ -320,3 +325,429 @@ class TestRenderizacaoLimpa:
         html = self._render(client, rota)
         for frase in ("criterio 3.1.1", "Link de pulo:", "Regiao de status", "Aviso deliberado"):
             assert frase not in html, f"Texto de comentario visivel em {rota}: {frase!r}"
+
+
+class TestMetodologiaFielAoCodigo:
+    """
+    A pagina /sobre/ e a prestacao de contas do projeto. Se ela descrever um
+    metodo que o codigo nao executa mais, o problema nao e cosmetico: e a
+    aplicacao afirmando algo falso sobre si mesma.
+    """
+
+    def _html(self, client):
+        resposta = client.get(reverse("sobre"))
+        assert resposta.status_code == 200
+        # O HTML quebra linha no meio das frases; normalizar o espaco em branco
+        # deixa o teste olhar para o texto, e nao para a formatacao do template.
+        return re.sub(r"\s+", " ", resposta.content.decode())
+
+    def test_pesos_exibidos_batem_com_os_do_codigo(self, client, db):
+        """
+        A tabela de pesos e escrita a mao no template. Este teste existe para
+        que ela nao fique para tras quando painel/risco.py mudar.
+        """
+        html = self._html(client)
+        for componente, peso in risco.PESOS.items():
+            exibido = f"{peso:.2f}".replace(".", ",")
+            assert exibido in html, (
+                f"O peso {exibido} do componente {componente!r} nao aparece em "
+                "/sobre/. Atualize a tabela de painel/templates/painel/sobre.html."
+            )
+
+    def test_soma_dos_pesos_e_um(self):
+        assert sum(risco.PESOS.values()) == pytest.approx(1.0)
+
+    def test_as_duas_versoes_do_indice_sao_explicadas(self, client, db):
+        """
+        O painel deixa alternar entre o indice de regras e a previsao. As duas
+        precisam estar descritas aqui, ou o seletor oferece uma escolha que a
+        pessoa nao tem como entender.
+        """
+        html = self._html(client)
+        assert "baseado em regras" in html.lower()
+        assert "quartil superior de abandono" in html
+
+    def test_limites_do_modelo_estao_declarados(self, client, db):
+        html = self._html(client)
+        assert "uma única transição entre anos" in html
+        assert "posição relativa" in html
+
+    def test_substituicao_do_inse_e_declarada(self, client, db):
+        """
+        O componente socioeconomico nao e o INSE: e um proxy municipal do IBGE.
+        A pagina precisa dizer isso com todas as letras, senao o painel deixa
+        entender que usa um indicador por escola que ele nao usa.
+        """
+        html = self._html(client)
+        assert "não é publicado de forma cruzável" in html
+        assert "Máscaras dos Códigos de Escola" in html
+        assert "salário médio mensal dos trabalhadores formais" in html.lower()
+
+    def test_limite_de_granularidade_e_declarado(self, client, db):
+        """
+        A consequencia mais importante da troca: dentro de um mesmo municipio o
+        componente nao diferencia escola nenhuma. Omitir isso seria vender uma
+        precisao que o dado nao tem.
+        """
+        html = self._html(client)
+        assert "Escolas do mesmo município recebem o mesmo valor" in html
+
+    def test_componente_socioeconomico_nao_se_chama_inse(self, client, db):
+        """
+        O nome importa: chamar o proxy municipal de INSE seria atribuir ao
+        projeto uma fonte que ele nao conseguiu usar.
+        """
+        html = self._html(client)
+        linha = "Contexto socioeconômico do município"
+        assert linha in html
+        # O INSE so pode aparecer na pagina explicando por que NAO foi usado.
+        assert "INSE, nível socioeconômico</th>" not in html
+
+
+class TestReflow:
+    """
+    Criterio 1.4.10 Reflow, nivel AA: a pagina precisa ser usavel a 320 px sem
+    rolagem horizontal.
+
+    Estes testes travam um defeito real, encontrado em 19/10/2026 medindo a
+    pagina renderizada. O <nav> do cabecalho e um item flexivel, e o tamanho
+    minimo automatico de um item flexivel e a largura do seu conteudo. Com
+    `justify-content: space-between` empurrando a navegacao para a direita, a
+    lista nunca quebrava linha: transbordava a faixa, o <body> ficava mais largo
+    que a janela, e TODA a pagina herdava rolagem horizontal, filtros e tabelas
+    inclusive. O sintoma aparecia longe da causa, e por isso fica registrado.
+    """
+
+    def _css(self):
+        return CSS.read_text(encoding="utf-8")
+
+    def test_navegacao_do_cabecalho_pode_encolher(self):
+        assert ".topo nav { min-width: 0; }" in self._css(), (
+            "Sem min-width zero o <nav> nao encolhe, transborda a faixa e deixa "
+            "a pagina inteira com rolagem horizontal."
+        )
+
+    def test_campos_do_formulario_podem_encolher(self):
+        """
+        Mesma armadilha nos filtros: base flexivel de varios rem sem min-width
+        zero nao encolhe abaixo dela.
+        """
+        css = self._css()
+        bloco = css[css.index(".campo {"):css.index(".campo {") + 400]
+        assert "min-width: 0" in bloco
+        assert "max-width: 100%" in bloco
+
+    def test_select_tem_largura_declarada(self):
+        """
+        Um <select> sem largura se dimensiona pela opcao mais longa. A opcao
+        "Previsão para o ano seguinte (modelo preditivo)" sozinha passa de
+        320 px.
+        """
+        assert ".campo select { width: 100%; }" in self._css()
+
+    def test_matriz_colapsa_em_uma_coluna(self):
+        css = self._css()
+        assert ".matriz { grid-template-columns: 1fr; }" in css
+        assert ".matriz-cartao { grid-column: auto; grid-row: auto; }" in css
+
+    def test_posicao_na_grade_nao_usa_estilo_inline(self):
+        """
+        O JavaScript posiciona os cartoes por variavel CSS, e nao por
+        grid-column inline. Estilo inline vence media query, e a grade deixaria
+        de colapsar em tela estreita.
+        """
+        js = (RAIZ / "painel" / "static" / "painel" / "painel.js").read_text(
+            encoding="utf-8"
+        )
+        assert "style.gridColumn" not in js
+        assert "style.gridRow" not in js
+        assert 'setProperty("--col"' in js
+
+
+class TestPaginaDaEscola:
+    """
+    Regressao de um defeito encontrado em 27/10/2026, depois que o modelo
+    preditivo entrou.
+
+    Cada escola passou a ter uma linha de indice POR VERSAO em cada ano: a do
+    indice baseado em regras e a da previsao. A pagina da escola listava as duas
+    sem distinguir, entao o mesmo ano aparecia duas vezes, com valores
+    diferentes e nenhuma explicacao, enquanto a legenda afirmava que a tabela
+    inteira era de uma versao so.
+    """
+
+    @pytest.fixture
+    def escola_com_duas_leituras(self, escolas):
+        from painel.models import IndiceRisco
+
+        escola = escolas[0]
+        for versao, score in (("regras-v1", 0.587), ("modelo-v1", 0.800)):
+            IndiceRisco.objects.update_or_create(
+                escola=escola, ano=2024, versao=versao,
+                defaults={"score": score, "classe": "alto"},
+            )
+        return escola
+
+    def _html(self, client, escola):
+        resposta = client.get(f"/escola/{escola.pk}/")
+        assert resposta.status_code == 200
+        return re.sub(r"\s+", " ", resposta.content.decode())
+
+    def test_historico_so_traz_anos_observados(self, client, db, escola_com_duas_leituras):
+        """
+        A tabela do historico e so da versao baseada em regras: e a unica que
+        descreve um ano que de fato aconteceu.
+        """
+        html = self._html(client, escola_com_duas_leituras)
+        assert "Trajetória observada" in html
+        assert "0,587" in html  # indice de 2024
+        # O numero da previsao nao pode aparecer dentro da tabela do historico.
+        tabela = html[html.index("Trajetória observada"):html.index("<h2>Previsão")]
+        assert "0,800" not in tabela
+
+    def test_previsao_fica_em_secao_propria(self, client, db, escola_com_duas_leituras):
+        """
+        O defeito que motivou a separacao: previsao e historico na mesma tabela,
+        na mesma coluna "Indice", em ordem nao cronologica.
+        """
+        html = self._html(client, escola_com_duas_leituras)
+        assert "<h2>Previsão</h2>" in html
+        assert "Para 2025" in html
+
+    def test_previsao_e_apresentada_como_probabilidade(self, client, db, escola_com_duas_leituras):
+        """
+        O indice de regras e uma soma ponderada; o score do modelo e uma
+        probabilidade. Exibir os dois como "Indice" sugeria que a escola tinha
+        piorado de um numero para o outro.
+        """
+        html = self._html(client, escola_com_duas_leituras)
+        assert "80%" in html
+        assert "probabilidade estimada" in html
+
+    def test_previsao_avisa_que_nao_e_comparavel(self, client, db, escola_com_duas_leituras):
+        html = self._html(client, escola_com_duas_leituras)
+        assert "Não é comparável ao índice da tabela acima" in html
+
+    def test_previsao_diz_de_onde_veio(self, client, db, escola_com_duas_leituras):
+        """O ano dos indicadores que geraram a previsao precisa estar visivel."""
+        html = self._html(client, escola_com_duas_leituras)
+        assert "a partir dos indicadores de 2024" in html
+
+    def test_escola_sem_previsao_nao_quebra(self, client, db, escolas):
+        from painel.models import IndiceRisco
+
+        escola = escolas[0]
+        IndiceRisco.objects.create(
+            escola=escola, ano=2024, versao="regras-v1", score=0.5, classe="medio"
+        )
+        html = self._html(client, escola)
+        assert "não recebeu previsão" in html
+
+
+class TestExplicabilidadeNaPagina:
+    """
+    A pagina da escola mostra POR QUE o indice e a previsao deram o que deram.
+
+    O risco que estes testes cobrem nao e visual: e a explicacao deixar de
+    corresponder ao calculo. Uma explicacao plausivel e errada e pior que
+    nenhuma, porque induz decisao com falsa confianca.
+    """
+
+    @pytest.fixture
+    def escola_explicada(self, escolas):
+        from painel.models import IndiceRisco
+
+        escola = escolas[2]
+        IndiceRisco.objects.update_or_create(
+            escola=escola, ano=2024, versao="regras-v1",
+            defaults={
+                "score": 0.8, "classe": "alto",
+                "detalhes": {
+                    "metodo": "soma_ponderada",
+                    "parcelas": [
+                        {"componente": "taxa_abandono", "valor": 25.0,
+                         "normalizado": 1.0, "peso": 0.40, "peso_efetivo": 0.40,
+                         "contribuicao": 0.40, "invertido": False},
+                        {"componente": "contexto_socioeconomico", "valor": 1.5,
+                         "normalizado": 0.8, "peso": 0.15, "peso_efetivo": 0.15,
+                         "contribuicao": 0.12, "invertido": True},
+                    ],
+                },
+            },
+        )
+        IndiceRisco.objects.update_or_create(
+            escola=escola, ano=2024, versao="modelo-v1",
+            defaults={
+                "score": 0.43, "classe": "alto",
+                "detalhes": {
+                    "metodo": "contribuicoes",
+                    "modelo": "Floresta aleatória",
+                    "base": 0.50,
+                    "contribuicoes": [
+                        {"atributo": "taxa_abandono", "valor": 0.0,
+                         "contribuicao": -0.11},
+                        {"atributo": "distorcao_idade_serie", "valor": 24.0,
+                         "contribuicao": 0.05},
+                    ],
+                },
+            },
+        )
+        return escola
+
+    def _html(self, client, escola):
+        resposta = client.get(f"/escola/{escola.pk}/")
+        assert resposta.status_code == 200
+        return re.sub(r"\s+", " ", resposta.content.decode())
+
+    def test_mostra_as_parcelas_do_indice(self, client, db, escola_explicada):
+        html = self._html(client, escola_explicada)
+        assert "Como este índice foi calculado" in html
+        assert "Taxa de abandono" in html
+        assert "Contexto socioeconômico do município" in html
+
+    def test_marca_o_componente_invertido(self, client, db, escola_explicada):
+        """
+        Sem a marca, um município mais rico com posição baixa parece erro de
+        cálculo para quem lê a tabela.
+        """
+        html = self._html(client, escola_explicada)
+        assert "(invertido)" in html
+
+    def test_explica_a_previsao_por_atributo(self, client, db, escola_explicada):
+        html = self._html(client, escola_explicada)
+        assert "Por que esta previsão" in html
+        assert "reduz o risco previsto" in html
+        assert "aumenta o risco previsto" in html
+
+    def test_mostra_o_ponto_de_partida_do_modelo(self, client, db, escola_explicada):
+        """
+        Sem a base, a explicação se contradiz: o maior fator pode REDUZIR o
+        risco e a escola ainda sair como risco alto.
+        """
+        html = self._html(client, escola_explicada)
+        assert "O modelo parte de" in html
+        assert "50%" in html
+
+    def test_avisa_que_a_classe_vem_de_tercis(self, client, db, escola_explicada):
+        """43% caindo em "risco alto" precisa de explicação, ou parece defeito."""
+        html = self._html(client, escola_explicada)
+        assert "não vem de um limiar fixo de probabilidade" in html
+
+    def test_sentido_nao_depende_so_da_cor(self, client, db, escola_explicada):
+        """
+        Criterio 1.4.1: a barra colorida e redundante. "aumenta" e "reduz"
+        aparecem escritos, junto da porcentagem.
+        """
+        html = self._html(client, escola_explicada)
+        import re as _re
+        assert _re.search(r"Responde por \d+% do que moveu", html)
+
+
+class TestOrdemDoPainel:
+    """
+    A pagina responde a duas perguntas, nesta ordem: ONDE agir e QUEM.
+
+    Antes a sequencia era introducao, filtros, matriz, resumo, dois graficos e
+    so entao o ranking, somando 4.200 px: quem precisava agir rolava quatro
+    telas ate a lista de escolas. Estes testes travam a ordem.
+    """
+
+    def _html(self, client):
+        resposta = client.get("/")
+        assert resposta.status_code == 200
+        return resposta.content.decode()
+
+    def test_matriz_vem_antes_do_ranking(self, client, db, escolas):
+        html = self._html(client)
+        assert html.index("titulo-matriz") < html.index("titulo-ranking")
+
+    def test_ranking_vem_antes_do_contexto(self, client, db, escolas):
+        """Resumo e grafico sao contexto: nao podem empurrar o ranking."""
+        html = self._html(client)
+        assert html.index("titulo-ranking") < html.index('class="panorama"')
+
+    def test_contexto_comeca_recolhido(self, client, db, escolas):
+        html = self._html(client)
+        bloco = html[html.index('<details class="panorama">') :][:200]
+        assert "open" not in bloco
+
+    def test_grafico_de_barras_por_classe_foi_removido(self, client, db, escolas):
+        """
+        A classificacao e por tercis dentro de (UF, ano), entao os tres grupos
+        tem o mesmo tamanho por construcao e o grafico nao informava nada.
+        Removido, nao escondido: o codigo morto tambem saiu do JavaScript.
+        """
+        html = self._html(client)
+        assert "g-classes" not in html
+        js = (RAIZ / "painel" / "static" / "painel" / "painel.js").read_text(
+            encoding="utf-8"
+        )
+        assert "desenharClasses" not in js
+        assert "graficoClasses" not in js
+
+    def test_grafico_dentro_do_recolhido_e_redesenhado(self):
+        """
+        Chart.js dimensiona o canvas pelo container. Dentro de um <details>
+        fechado o container tem tamanho zero, e o grafico sairia vazio e assim
+        ficaria depois de aberto.
+        """
+        js = (RAIZ / "painel" / "static" / "painel" / "painel.js").read_text(
+            encoding="utf-8"
+        )
+        assert 'addEventListener("toggle"' in js
+
+
+class TestIdentidadeVisual:
+    """
+    A marca tem os mesmos deveres do resto da interface: cor vinda da paleta
+    validada, nome legivel por leitor de tela, icone servido de verdade.
+    """
+
+    MARCA = RAIZ / "painel" / "static" / "painel" / "marca.svg"
+    ICONE = RAIZ / "painel" / "static" / "painel" / "favicon.png"
+
+    def test_arquivos_da_marca_existem(self):
+        assert self.MARCA.exists(), "marca.svg ausente"
+        assert self.ICONE.exists(), "favicon.png ausente"
+
+    def test_cor_da_marca_vem_da_paleta(self):
+        """
+        O SVG tem hexadecimal literal, porque arquivo de icone nao enxerga as
+        variaveis do CSS. Se divergir da paleta, a marca passa a usar uma cor
+        que ninguem validou.
+        """
+        svg = self.MARCA.read_text(encoding="utf-8").upper()
+        usadas = set(re.findall(r"#[0-9A-F]{6}\b", svg))
+        fora = usadas - cores.todos_os_hex()
+        assert not fora, f"Cores no marca.svg fora da paleta: {sorted(fora)}"
+
+    def test_azul_da_marca_contrasta_com_o_branco_do_simbolo(self):
+        """
+        O traco e branco sobre o quadrado azul. E elemento grafico: minimo 3:1
+        pelo criterio 1.4.11.
+        """
+        razao = cores.contraste(cores.LINK, cores.BRANCO)
+        assert razao >= cores.CONTRASTE_MINIMO_GRAFICO
+
+    def test_pagina_declara_o_icone(self, client, db):
+        html = client.get("/").content.decode()
+        assert 'rel="icon"' in html
+        assert "marca.svg" in html
+        assert "favicon.png" in html
+
+    def test_simbolo_nao_e_anunciado_duas_vezes(self, client, db):
+        """
+        O SVG embutido fica com aria-hidden: o nome ao lado ja identifica o
+        produto, e anunciar os dois seria repeticao no leitor de tela.
+        """
+        html = re.sub(r"\s+", " ", client.get("/").content.decode())
+        i = html.index('class="marca-simbolo"')
+        assert 'aria-hidden="true"' in html[i : i + 200]
+
+    def test_nome_continua_em_texto(self, client, db):
+        """
+        A marca e texto com um simbolo ao lado, nunca uma imagem do nome: assim
+        ela e selecionavel, aumenta com o zoom e e lida por leitor de tela.
+        """
+        html = re.sub(r"\s+", " ", client.get("/").content.decode())
+        assert "<span>Educa</span><strong>Alerta</strong>" in html

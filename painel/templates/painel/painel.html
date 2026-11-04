@@ -7,10 +7,8 @@
 <h1>Risco de abandono e reprovação na educação básica</h1>
 
 <p class="introducao">
-  As escolas são ordenadas por um índice de risco calculado a partir de taxas de
-  reprovação e abandono, distorção idade-série e nível socioeconômico, todos
-  indicadores públicos do INEP. O método está descrito na
-  <a href="{% url 'sobre' %}">página de metodologia</a>.
+  Escolas de ensino médio da rede estadual, ordenadas por risco de abandono a
+  partir de dados do INEP. <a href="{% url 'sobre' %}">Como o risco é calculado</a>.
 </p>
 
 {% if sem_dados %}
@@ -24,6 +22,11 @@
 <form id="filtros" class="filtros" aria-labelledby="titulo-filtros">
   <h2 id="titulo-filtros">Filtros</h2>
   <div class="campos">
+    <p class="campo campo-busca">
+      <label for="f-busca">Buscar escola pelo nome</label>
+      <input type="search" id="f-busca" name="busca" placeholder="ex.: Dom Pedro"
+             autocomplete="off" spellcheck="false">
+    </p>
     <p class="campo">
       <label for="f-uf">Unidade federativa</label>
       <select id="f-uf" name="uf">
@@ -48,10 +51,24 @@
         <option value="baixo">Risco baixo</option>
       </select>
     </p>
-    <p class="campo">
-      <button type="submit">Aplicar filtros</button>
+    {% if versoes|length > 1 %}
+    <p class="campo campo-versao">
+      <label for="f-versao">Como calcular o risco</label>
+      <select id="f-versao" name="versao" aria-describedby="ajuda-versao">
+        {% for v in versoes %}
+          <option value="{{ v.valor }}">{{ v.rotulo }}</option>
+        {% endfor %}
+      </select>
+    </p>
+    {% endif %}
+    <p class="campo campo-acoes">
+      <button type="submit">Aplicar</button>
+      <button type="button" id="limpar" class="secundario">Limpar</button>
     </p>
   </div>
+  {% if versoes|length > 1 %}
+    <p id="ajuda-versao" class="ajuda"></p>
+  {% endif %}
 </form>
 
 {% comment %}
@@ -60,75 +77,51 @@
 {% endcomment %}
 <p id="status" class="status" role="status" aria-live="polite">Carregando dados.</p>
 
-<section aria-labelledby="titulo-resumo">
-  <h2 id="titulo-resumo">Resumo</h2>
-  <dl class="cartoes" id="cartoes">
-    <div class="cartao"><dt>Escolas</dt><dd id="c-escolas">&ndash;</dd></div>
-    <div class="cartao"><dt>Abandono médio</dt><dd id="c-abandono">&ndash;</dd></div>
-    <div class="cartao"><dt>Reprovação média</dt><dd id="c-reprovacao">&ndash;</dd></div>
-    <div class="cartao"><dt>Distorção idade-série média</dt><dd id="c-distorcao">&ndash;</dd></div>
-  </dl>
-</section>
+{% comment %}
+  Matriz de decisao. Cruza o indice atual com a previsao do modelo e separa as
+  escolas em quatro grupos de acao. A grade e montada pelo JavaScript a partir
+  de /api/indicadores/matriz/, porque as contagens dependem dos filtros.
+{% endcomment %}
+<section aria-labelledby="titulo-matriz" id="secao-matriz">
+  <h2 id="titulo-matriz">Onde agir primeiro</h2>
+  <p class="matriz-introducao">
+    A situação de hoje cruzada com a previsão para o ano seguinte. Selecione um
+    grupo para ver as escolas dele.
+  </p>
 
-<section aria-labelledby="titulo-graficos">
-  <h2 id="titulo-graficos">Gráficos</h2>
+  <div class="matriz" id="matriz" role="group" aria-labelledby="titulo-matriz"></div>
 
-  <div class="grafico-bloco">
-    <h3 id="titulo-g1">Escolas por nível de risco</h3>
-    {% comment %}
-      O grafico tem role img e um resumo textual. Alem disso, os mesmos dados
-      aparecem em tabela abaixo: criterio 1.1.1 (Conteudo Nao Textual, nivel A).
-    {% endcomment %}
-    <canvas id="g-classes" height="220" role="img" aria-labelledby="titulo-g1" aria-describedby="resumo-g1"></canvas>
-    <p id="resumo-g1" class="resumo-grafico">Distribuição da quantidade de escolas em cada nível de risco.</p>
-    <details>
-      <summary>Ver os dados do gráfico em tabela</summary>
-      <table id="t-classes">
-        <caption>Quantidade de escolas por nível de risco</caption>
-        <thead><tr><th scope="col">Nível de risco</th><th scope="col">Escolas</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </details>
-  </div>
+  <p id="matriz-nota" class="nota"></p>
 
-  <div class="grafico-bloco">
-    <h3 id="titulo-g2">Nível socioeconômico e taxa de abandono</h3>
-    <canvas id="g-dispersao" height="260" role="img" aria-labelledby="titulo-g2" aria-describedby="resumo-g2"></canvas>
-    <p id="resumo-g2" class="resumo-grafico">
-      Cada ponto é uma escola. O eixo horizontal traz o INSE, indicador de nível
-      socioeconômico, e o vertical a taxa de abandono em porcentagem.
-    </p>
-    <details>
-      <summary>Ver os dados do gráfico em tabela</summary>
-      <p class="nota">Tabela limitada às 50 escolas de maior taxa de abandono na seleção atual.</p>
-      <table id="t-dispersao">
-        <caption>INSE e taxa de abandono por escola</caption>
-        <thead><tr><th scope="col">Escola</th><th scope="col">INSE</th><th scope="col">Abandono (%)</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </details>
+  <div id="grupo-escolhido" class="grupo-escolhido" role="status" hidden>
+    <h3 id="grupo-nome"></h3>
+    <p id="grupo-explicacao"></p>
+    <p id="grupo-acao" class="acao"></p>
+    <p><button type="button" id="grupo-limpar" class="secundario">Ver todas as escolas</button></p>
   </div>
 </section>
 
 <section aria-labelledby="titulo-ranking">
   <h2 id="titulo-ranking">Escolas por índice de risco</h2>
-  <table id="t-ranking">
-    <caption>
-      Escolas ordenadas do maior para o menor índice de risco.
-      O nível aparece sempre em texto, não apenas por cor.
-    </caption>
-    <thead>
-      <tr>
-        <th scope="col">Escola</th>
-        <th scope="col">UF</th>
-        <th scope="col">Município</th>
-        <th scope="col">Ano</th>
-        <th scope="col">Índice</th>
-        <th scope="col">Nível de risco</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="tabela-rolavel">
+    <table id="t-ranking" class="tabela-dados">
+      <caption id="legenda-ranking">
+        Escolas ordenadas do maior para o menor índice de risco.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Escola</th>
+          <th scope="col">UF</th>
+          <th scope="col">Município</th>
+          <th scope="col">Ano</th>
+          <th scope="col" class="numero">Índice</th>
+          <th scope="col">Nível de risco</th>
+          <th scope="col" id="th-previsao" hidden>Previsão para o ano seguinte</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <nav class="paginacao" aria-label="Paginação do ranking">
     <button type="button" id="pag-anterior">Página anterior</button>
     <span id="pag-info">&ndash;</span>
@@ -136,11 +129,76 @@
   </nav>
 </section>
 
+{% comment %}
+  Resumo e grafico ficam recolhidos de proposito.
+
+  A pagina responde a duas perguntas, nesta ordem: ONDE agir, que a matriz
+  responde, e QUEM, que o ranking responde. Media de abandono e dispersao sao
+  contexto: ajudam a interpretar, nao a decidir, e antes ficavam entre a matriz
+  e o ranking, empurrando a lista de escolas para a quarta tela.
+
+  O grafico de barras por nivel de risco foi REMOVIDO, nao escondido. A
+  classificacao e por tercis dentro de (UF, ano), entao os tres grupos tem o
+  mesmo tamanho por construcao: ele mostrava 6.707, 6.730 e 6.692 e gastava uma
+  tela inteira para nao informar nada.
+{% endcomment %}
+<details class="panorama">
+  <summary>Panorama da seleção</summary>
+
+  <section aria-labelledby="titulo-resumo">
+    <h2 id="titulo-resumo">Números da seleção</h2>
+  <dl class="cartoes" id="cartoes">
+    <div class="cartao">
+      <dt>Escolas</dt><dd id="c-escolas">&ndash;</dd>
+      <p class="variacao" id="v-escolas"></p>
+    </div>
+    <div class="cartao">
+      <dt>Abandono médio</dt><dd id="c-abandono">&ndash;</dd>
+      <p class="variacao" id="v-abandono"></p>
+    </div>
+    <div class="cartao">
+      <dt>Reprovação média</dt><dd id="c-reprovacao">&ndash;</dd>
+      <p class="variacao" id="v-reprovacao"></p>
+    </div>
+    <div class="cartao">
+      <dt>Distorção idade-série média</dt><dd id="c-distorcao">&ndash;</dd>
+      <p class="variacao" id="v-distorcao"></p>
+    </div>
+  </dl>
+</section>
+
+  <section aria-labelledby="titulo-graficos">
+    <h2 id="titulo-graficos">Indicador socioeconômico e abandono</h2>
+    <div class="grafico-bloco">
+    {% comment %}
+      Titulo, resumo e cabecalho da tabela sao preenchidos pelo JavaScript: o
+      indicador do eixo horizontal depende de qual deles tem dados na selecao,
+      e a pagina precisa descrever o grafico que esta de fato na tela.
+    {% endcomment %}
+    <h3 id="titulo-g2">Indicador socioeducacional e taxa de abandono</h3>
+    <div class="grafico-area">
+      <canvas id="g-dispersao" role="img" aria-labelledby="titulo-g2" aria-describedby="resumo-g2"></canvas>
+    </div>
+    <p id="resumo-g2" class="resumo-grafico"></p>
+    <details>
+      <summary>Ver os dados do gráfico em tabela</summary>
+      <p class="nota">Tabela limitada às 50 escolas de maior taxa de abandono na seleção atual.</p>
+      <table id="t-dispersao">
+        <caption>Indicador do eixo horizontal e taxa de abandono por escola</caption>
+        <thead><tr><th scope="col">Escola</th><th scope="col" id="th-dispersao" class="numero">Indicador</th><th scope="col" class="numero">Abandono (%)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+  </div>
+  </section>
+</details>
+
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
   {# Cores vindas de painel/cores.py, fonte unica de verdade da paleta. #}
   <script id="paleta" type="application/json">{{ paleta_json|default:"{}" }}</script>
+  <script id="descricoes-versao" type="application/json">{{ descricoes_versao|default:"{}" }}</script>
   <script src="{% static 'painel/painel.js' %}"></script>
 {% endblock %}

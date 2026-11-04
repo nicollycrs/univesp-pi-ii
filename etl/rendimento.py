@@ -45,7 +45,7 @@ class FormatoInesperado(RuntimeError):
     """A planilha nao tem a estrutura esperada. Provavel mudanca de edicao."""
 
 
-def _indices_das_colunas(ws, etapa: str) -> tuple[dict[str, int], list[str]]:
+def _indices_das_colunas(ws, etapa: str, mapa: dict | None = None) -> tuple[dict[str, int], list[str]]:
     """
     Localiza as colunas pelos codigos da linha 9, em vez de por posicao fixa.
 
@@ -63,7 +63,7 @@ def _indices_das_colunas(ws, etapa: str) -> tuple[dict[str, int], list[str]]:
 
     posicao = {c: i for i, c in enumerate(codigos) if c}
 
-    alvo = dict(mapa_etapa(etapa))
+    alvo = dict(mapa if mapa is not None else mapa_etapa(etapa))
     desejadas: dict[str, int] = {}
     faltando: list[str] = []
 
@@ -88,12 +88,21 @@ def _indices_das_colunas(ws, etapa: str) -> tuple[dict[str, int], list[str]]:
     return desejadas, faltando
 
 
-def ler(caminho: str | Path, etapa: str = "MED", limite: int | None = None) -> pd.DataFrame:
+def ler(
+    caminho: str | Path,
+    etapa: str = "MED",
+    limite: int | None = None,
+    mapa: dict | None = None,
+) -> pd.DataFrame:
     """
     Le a planilha e devolve um dataframe estreito, ainda cru.
 
     A limpeza fica com `etl.transformar.transformar()`: aqui so se extrai o
     recorte de colunas. `limite` serve para inspecionar o arquivo rapidamente.
+
+    `mapa` permite usar o mesmo leitor para outras planilhas do INEP que seguem
+    a mesma estrutura, como a de distorcao idade-serie, que muda apenas os
+    codigos das colunas de indicador.
     """
     caminho = Path(caminho)
     if not caminho.exists():
@@ -107,7 +116,7 @@ def ler(caminho: str | Path, etapa: str = "MED", limite: int | None = None) -> p
             )
         ws = wb[ABA]
 
-        desejadas, faltando = _indices_das_colunas(ws, etapa)
+        desejadas, faltando = _indices_das_colunas(ws, etapa, mapa)
         if faltando:
             raise FormatoInesperado(
                 "A planilha nao tem as colunas esperadas: "
@@ -134,6 +143,17 @@ def ler(caminho: str | Path, etapa: str = "MED", limite: int | None = None) -> p
 
 
 def caminho_padrao(ano: int, raiz: str | Path = "dados_brutos") -> Path:
-    """Caminho onde o zip do INEP extrai a planilha daquele ano."""
+    """Caminho onde o zip de Taxas de Rendimento extrai a planilha daquele ano."""
     raiz = Path(raiz)
     return raiz / f"tx_rend_escolas_{ano}" / f"tx_rend_escolas_{ano}.xlsx"
+
+
+def caminho_distorcao(ano: int, raiz: str | Path = "dados_brutos") -> Path:
+    """
+    Caminho da planilha de distorcao idade-serie.
+
+    Download: https://download.inep.gov.br/informacoes_estatisticas/
+    indicadores_educacionais/{ano}/TDI_{ano}_ESCOLAS.zip
+    """
+    raiz = Path(raiz)
+    return raiz / f"TDI_{ano}" / f"TDI_{ano}_ESCOLAS" / f"TDI_ESCOLAS_{ano}.xlsx"

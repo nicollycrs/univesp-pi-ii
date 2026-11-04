@@ -16,6 +16,25 @@ class Municipio(models.Model):
     uf = models.CharField("UF", max_length=2, db_index=True)
     regiao = models.CharField("região", max_length=20, blank=True)
 
+    # Contexto socioeconomico do territorio onde a escola opera.
+    #
+    # Ocupa no indice a vaga que seria do INSE do INEP. O INSE por escola nao e
+    # publicado de forma cruzavel: ele existe nos microdados do Saeb 2023, mas
+    # com os codigos de escola mascarados por LGPD. A substituicao esta
+    # documentada em docs/FONTES_DE_DADOS.md e declarada na pagina /sobre/.
+    #
+    # E deliberadamente um campo do municipio, e nao da escola: a fonte e
+    # municipal, e fingir granularidade de escola seria mentir sobre o dado.
+    salario_medio = models.FloatField(
+        "salário médio mensal",
+        null=True,
+        blank=True,
+        help_text="Em salários mínimos. IBGE, trabalhadores formais.",
+    )
+    salario_medio_ano = models.PositiveSmallIntegerField(
+        "ano de referência do salário médio", null=True, blank=True
+    )
+
     class Meta:
         verbose_name = "município"
         verbose_name_plural = "municípios"
@@ -123,6 +142,22 @@ class IndiceRisco(models.Model):
     classe = models.CharField(max_length=6, choices=Classe.choices, db_index=True)
     versao = models.CharField(max_length=40, db_index=True)
     calculado_em = models.DateTimeField(auto_now=True)
+
+    # A conta aberta por tras do score, para a pagina da escola explicar POR QUE
+    # o numero deu o que deu. O formato muda conforme a versao:
+    #
+    #   regras-v1  {"metodo": "soma_ponderada", "parcelas": [...]}
+    #              cada parcela traz valor, normalizado, peso efetivo e
+    #              contribuicao. A soma das contribuicoes e o proprio score.
+    #
+    #   modelo-v1  {"metodo": "contribuicoes", "base": float,
+    #               "contribuicoes": [...]}
+    #              decomposicao exata da previsao: base mais a soma das
+    #              contribuicoes reproduz o que o modelo devolveu.
+    #
+    # Fica em JSON e nao em tabela propria porque e sempre lido junto com a
+    # linha, nunca consultado ou agregado por conta propria.
+    detalhes = models.JSONField("detalhes do cálculo", null=True, blank=True)
 
     class Meta:
         verbose_name = "índice de risco"

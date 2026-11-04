@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="EducaAlerta">
+  <title>EducaAlerta</title>
+  <!--
+    Simbolo do EducaAlerta.
+
+    A linha e uma trajetoria escolar: desce, hesita e dispara para cima. O ponto
+    cheio marca o momento em que o painel aponta o risco, antes do topo. E a
+    tese do projeto em um desenho: identificar cedo, nao constatar depois.
+
+    Azul e deliberado. No painel, vermelho, ambar e verde ja carregam
+    significado de risco; a marca precisa ser neutra para nao competir com eles
+    nem alarmar sozinha.
+
+    O hexadecimal repete painel/cores.py (LINK) e ha teste que falha se divergir.
+  -->
+  <rect width="32" height="32" rx="7" fill="#1D4ED8"/>
+  <polyline points="7,22 13,16 18,19 24,10"
+            fill="none" stroke="#FFFFFF" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="10" r="3.4" fill="#FFFFFF"/>
+</svg>

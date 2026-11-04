@@ -10,6 +10,14 @@
   <title>{% block titulo %}EducaAlerta{% endblock %}</title>
   <meta name="description" content="Painel acessível de risco de abandono e reprovação na educação básica, a partir de dados abertos do INEP.">
   <link rel="stylesheet" href="{% static 'painel/painel.css' %}">
+  {% comment %}
+    Icone da aba. O SVG e a versao preferida, por ser nitido em qualquer tamanho;
+    o PNG atende navegadores que ainda nao aceitam SVG como icone. Sem eles o
+    servidor respondia 404 a cada visita, e a aba ficava com o icone generico.
+  {% endcomment %}
+  <link rel="icon" type="image/svg+xml" href="{% static 'painel/marca.svg' %}">
+  <link rel="icon" type="image/png" sizes="64x64" href="{% static 'painel/favicon.png' %}">
+  <meta name="theme-color" content="#1D4ED8">
 </head>
 <body>
   {% comment %}
@@ -20,7 +28,25 @@
 
   <header class="topo">
     <div class="faixa">
-      <p class="marca"><a href="{% url 'painel' %}">EducaAlerta</a></p>
+      {% comment %}
+        Assinatura da marca: simbolo mais nome.
+
+        O SVG vem embutido, e nao como <img>, para herdar a cor do CSS e nao
+        custar uma requisicao a mais no primeiro acesso, que no plano gratuito
+        ja e lento. aria-hidden porque o nome ao lado ja identifica o produto:
+        anunciar os dois seria repeticao para quem usa leitor de tela.
+      {% endcomment %}
+      <p class="marca">
+        <a href="{% url 'painel' %}">
+          <svg class="marca-simbolo" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <rect width="32" height="32" rx="7" fill="currentColor"/>
+            <polyline points="7,22 13,16 18,19 24,10" fill="none" stroke="var(--fundo)"
+                      stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="24" cy="10" r="3.4" fill="var(--fundo)"/>
+          </svg>
+          <span class="marca-nome"><span>Educa</span><strong>Alerta</strong></span>
+        </a>
+      </p>
       <nav aria-label="Navegação principal">
         <ul>
           <li><a href="{% url 'painel' %}">Painel</a></li>

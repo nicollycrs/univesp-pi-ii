@@ -8,7 +8,10 @@ from painel.models import Escola, IndicadorAnual, Municipio
 @pytest.fixture
 def municipio(db):
     return Municipio.objects.create(
-        codigo_ibge="3550308", nome="São Paulo", uf="SP", regiao="Sudeste"
+        codigo_ibge="3550308", nome="São Paulo", uf="SP", regiao="Sudeste",
+        # Contexto socioeconomico do municipio, em salarios minimos. Ocupa no
+        # indice a vaga que seria do INSE do INEP.
+        salario_medio=4.3, salario_medio_ano=2021,
     )
 
 

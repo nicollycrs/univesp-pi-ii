@@ -27,13 +27,33 @@ PESOS = {
     "taxa_abandono": 0.40,
     "taxa_reprovacao": 0.25,
     "distorcao_idade_serie": 0.20,
-    "inse_invertido": 0.15,
+    "contexto_socioeconomico_invertido": 0.15,
 }
 
 # Componentes em que valor maior significa risco maior.
 COMPONENTES_DIRETOS = ("taxa_abandono", "taxa_reprovacao", "distorcao_idade_serie")
-# O INSE e invertido: nivel socioeconomico menor significa risco maior.
-COMPONENTE_INVERTIDO = "inse"
+
+# Componente socioeconomico, invertido: contexto mais pobre significa risco maior.
+#
+# A fonte pretendida era o INSE do INEP, por escola. Ele nao e publicado de
+# forma cruzavel: esta nos microdados do Saeb 2023, na coluna
+# NIVEL_SOCIO_ECONOMICO, mas com os codigos de escola mascarados por LGPD
+# ("Mascaras dos Codigos de Escola (sao codigos ficticios)", dicionario oficial),
+# o que impede a juncao pelo codigo do Censo.
+#
+# A vaga passou a ser ocupada pelo salario medio mensal dos trabalhadores
+# formais do MUNICIPIO, do IBGE. A troca muda a natureza do componente e isso e
+# declarado em todo lugar onde ele aparece:
+#
+#   - granularidade cai de escola para municipio: escolas do mesmo municipio
+#     recebem o mesmo valor, e o componente nao as diferencia entre si;
+#   - mede o territorio, nao as familias dos estudantes daquela escola;
+#   - cobre so o trabalho formal, entao subestima a informalidade.
+#
+# O que ele preserva: e dado publico, oficial, cruzavel e varia dentro de cada
+# UF, que e a condicao para contribuir com o indice, ja que a normalizacao
+# acontece dentro do grupo (uf, ano).
+COMPONENTE_INVERTIDO = "contexto_socioeconomico"
 
 CLASSE_BAIXO, CLASSE_MEDIO, CLASSE_ALTO = "baixo", "medio", "alto"
 
@@ -54,13 +74,33 @@ def _limites(registros, campo):
     return min(valores), max(valores)
 
 
+# Nome legivel de cada componente, para a explicacao na pagina da escola.
+ROTULO_COMPONENTE = {
+    "taxa_abandono": "Taxa de abandono",
+    "taxa_reprovacao": "Taxa de reprovação",
+    "distorcao_idade_serie": "Distorção idade-série",
+    "contexto_socioeconomico": "Contexto socioeconômico do município",
+}
+
+UNIDADE_COMPONENTE = {
+    "taxa_abandono": "%",
+    "taxa_reprovacao": "%",
+    "distorcao_idade_serie": "%",
+    "contexto_socioeconomico": "salários mínimos",
+}
+
+
 def _score_de_um(registro, limites):
     """
-    Soma ponderada dos componentes disponiveis.
+    Soma ponderada dos componentes disponiveis, e a conta aberta.
+
+    Devolve (score, parcelas), onde cada parcela registra como aquele componente
+    contribuiu. A conta aberta existe para a pagina da escola poder mostrar POR
+    QUE o indice deu o que deu, em vez de pedir confianca em um numero.
 
     Quando um componente esta ausente, o peso dele e redistribuido entre os
-    demais em proporcao. Assim uma escola sem INSE ainda recebe score, em vez de
-    ser descartada, e o resultado continua na escala de 0 a 1.
+    demais em proporcao. Assim uma escola sem um indicador ainda recebe score,
+    em vez de ser descartada, e o resultado continua na escala de 0 a 1.
     """
     parcelas = []
 
@@ -68,18 +108,44 @@ def _score_de_um(registro, limites):
         minimo, maximo = limites[campo]
         norm = _minmax(registro.get(campo), minimo, maximo)
         if norm is not None:
-            parcelas.append((PESOS[campo], norm))
+            parcelas.append(
+                {
+                    "componente": campo,
+                    "valor": registro.get(campo),
+                    "normalizado": norm,
+                    "peso": PESOS[campo],
+                    "invertido": False,
+                }
+            )
 
     minimo, maximo = limites[COMPONENTE_INVERTIDO]
-    norm_inse = _minmax(registro.get(COMPONENTE_INVERTIDO), minimo, maximo)
-    if norm_inse is not None:
-        parcelas.append((PESOS["inse_invertido"], 1.0 - norm_inse))
+    norm_contexto = _minmax(registro.get(COMPONENTE_INVERTIDO), minimo, maximo)
+    if norm_contexto is not None:
+        parcelas.append(
+            {
+                "componente": COMPONENTE_INVERTIDO,
+                "valor": registro.get(COMPONENTE_INVERTIDO),
+                # Invertido: contexto mais rico significa risco menor, entao o
+                # que entra na soma e o complemento do valor normalizado.
+                "normalizado": 1.0 - norm_contexto,
+                "peso": PESOS["contexto_socioeconomico_invertido"],
+                "invertido": True,
+            }
+        )
 
     if not parcelas:
-        return None
+        return None, []
 
-    peso_total = sum(p for p, _ in parcelas)
-    return sum(p * v for p, v in parcelas) / peso_total
+    # Peso efetivo: quando falta componente, o peso dele se redistribui entre os
+    # presentes. Guardar o efetivo, e nao o nominal, e o que faz as parcelas
+    # somarem exatamente o score.
+    peso_total = sum(p["peso"] for p in parcelas)
+    for p in parcelas:
+        p["peso_efetivo"] = p["peso"] / peso_total
+        p["contribuicao"] = p["peso_efetivo"] * p["normalizado"]
+
+    score = sum(p["contribuicao"] for p in parcelas)
+    return score, parcelas
 
 
 def _classificar_por_tercis(scores):
@@ -130,22 +196,68 @@ def calcular(registros):
 
         com_score = []
         for r in grupo:
-            score = _score_de_um(r, limites)
-            com_score.append((r, score))
+            score, parcelas = _score_de_um(r, limites)
+            com_score.append((r, score, parcelas))
 
-        scores_validos = [s for _, s in com_score if s is not None]
+        scores_validos = [s for _, s, _ in com_score if s is not None]
         corte_baixo, corte_medio = _classificar_por_tercis(scores_validos)
 
-        for r, score in com_score:
+        for r, score, parcelas in com_score:
             novo = dict(r)
             novo["score"] = score
             novo["classe"] = (
                 None if score is None else classe_de(score, corte_baixo, corte_medio)
             )
             novo["versao"] = VERSAO
+            # A conta aberta acompanha o resultado, para a pagina da escola.
+            novo["detalhes"] = (
+                None if score is None
+                else {"metodo": "soma_ponderada", "parcelas": parcelas}
+            )
             saida.append(novo)
 
     return saida
+
+
+# Nome legivel de cada versao do indice, para o seletor do painel.
+ROTULO_VERSAO = {
+    "regras-v1": "Índice atual (baseado em regras)",
+    "modelo-v1": "Previsão para o ano seguinte (modelo preditivo)",
+}
+
+# Ordem de apresentacao no seletor. O indice de regras vem primeiro por ser a
+# leitura padrao: descreve a situacao do ano consultado.
+ORDEM_VERSAO = {"regras-v1": 0, "modelo-v1": 1}
+
+DESCRICAO_VERSAO = {
+    "regras-v1": (
+        "Combina os indicadores do próprio ano em uma soma ponderada. "
+        "Descreve a situação atual da escola."
+    ),
+    "modelo-v1": (
+        "Modelo treinado para estimar, a partir dos indicadores do ano "
+        "selecionado, se a escola estará no quartil superior de abandono da sua "
+        "UF no ano seguinte. Antecipa, em vez de descrever."
+    ),
+}
+
+# Em uma linha de IndiceRisco, `ano` significa coisas diferentes conforme a
+# versao, e isso precisa ficar explicito onde a linha e exibida:
+#
+#   regras-v1  o ano DESCRITO. A escola estava assim naquele ano.
+#   modelo-v1  o ano de REFERENCIA dos indicadores que geraram a previsao.
+#              O ano previsto e esse mais um.
+#
+# Sem essa distincao a pagina da escola mostrava "2024" em duas linhas com
+# valores diferentes, e um leitor razoavel concluiria que uma delas esta errada.
+ANO_PREVISTO_SOMA = {"regras-v1": 0, "modelo-v1": 1}
+
+
+def descrever_leitura(versao, ano):
+    """Rotulo de uma linha do indice, com o ano a que ela de fato se refere."""
+    if versao == "modelo-v1":
+        return f"Previsão para {ano + 1} (a partir de {ano})"
+    return ROTULO_VERSAO.get(versao, versao)
 
 
 ROTULOS = {

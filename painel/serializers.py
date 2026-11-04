@@ -83,6 +83,12 @@ class IndiceRiscoSerializer(serializers.ModelSerializer):
     )
     rede = serializers.CharField(source="escola.rede", read_only=True)
     rotulo = serializers.SerializerMethodField()
+    # Presentes apenas quando a consulta filtra por grupo da matriz de decisao,
+    # que e quando a previsao do modelo foi anexada por subconsulta. Nos demais
+    # casos vem nulos, e nao ausentes, para que o formato da resposta nao mude.
+    score_previsto = serializers.SerializerMethodField()
+    classe_prevista = serializers.SerializerMethodField()
+    rotulo_previsto = serializers.SerializerMethodField()
 
     class Meta:
         model = IndiceRisco
@@ -97,7 +103,20 @@ class IndiceRiscoSerializer(serializers.ModelSerializer):
             "classe",
             "rotulo",
             "versao",
+            "score_previsto",
+            "classe_prevista",
+            "rotulo_previsto",
         ]
 
     def get_rotulo(self, obj):
         return risco.rotulo(obj.classe)
+
+    def get_score_previsto(self, obj):
+        return getattr(obj, "score_previsto", None)
+
+    def get_classe_prevista(self, obj):
+        return getattr(obj, "classe_prevista", None)
+
+    def get_rotulo_previsto(self, obj):
+        classe = getattr(obj, "classe_prevista", None)
+        return risco.rotulo(classe) if classe else None

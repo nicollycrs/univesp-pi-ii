@@ -3,14 +3,17 @@
 {% block titulo %}Metodologia | EducaAlerta{% endblock %}
 
 {% block conteudo %}
-<h1>Metodologia do índice de risco</h1>
+<h1>Metodologia</h1>
 
 <p class="introducao">
-  Esta página existe para que ninguém use o índice sem saber como ele foi
-  construído, o que ele não mede e de onde vêm os dados.
+  Esta página existe para que ninguém use os números do painel sem saber como
+  foram construídos, o que não medem e de onde vêm os dados. O painel oferece
+  duas leituras, e elas respondem a perguntas diferentes: o índice descreve a
+  situação atual da escola, e o modelo preditivo antecipa a situação do ano
+  seguinte.
 </p>
 
-<h2>Como o índice é calculado</h2>
+<h2>Índice atual, baseado em regras</h2>
 <p>
   Para cada escola, quatro componentes são normalizados entre 0 e 1 dentro do
   grupo formado pela unidade federativa e pelo ano, e combinados por soma
@@ -27,7 +30,7 @@
       <tr><th scope="row">Taxa de abandono</th><td class="numero">0,40</td><td>Maior valor eleva o risco</td></tr>
       <tr><th scope="row">Taxa de reprovação</th><td class="numero">0,25</td><td>Maior valor eleva o risco</td></tr>
       <tr><th scope="row">Distorção idade-série</th><td class="numero">0,20</td><td>Maior valor eleva o risco</td></tr>
-      <tr><th scope="row">INSE, nível socioeconômico</th><td class="numero">0,15</td><td>Invertido: nível menor eleva o risco</td></tr>
+      <tr><th scope="row">Contexto socioeconômico do município</th><td class="numero">0,15</td><td>Invertido: contexto mais pobre eleva o risco</td></tr>
     </tbody>
   </table>
 </div>
@@ -39,6 +42,51 @@
   receba índice em vez de ser descartada.
 </p>
 
+<div class="aviso" role="note">
+  <strong>Estado atual dos componentes.</strong>
+  Os quatro componentes estão preenchidos com dados reais, e o índice opera com
+  peso total. Abandono, reprovação e distorção idade-série vêm do INEP, por
+  escola. O contexto socioeconômico vem do IBGE, por município, e substitui o
+  indicador que o projeto pretendia usar, conforme explicado logo abaixo.
+</div>
+
+<h3>Por que o contexto socioeconômico é municipal</h3>
+<p>
+  A fonte pretendida era o INSE, o Indicador de Nível Socioeconômico do INEP,
+  calculado por escola. Ele <strong>não é publicado de forma cruzável</strong>.
+  A página oficial do indicador traz apenas notas técnicas, e o valor por escola
+  existe nos microdados do Saeb 2023, mas acompanhado de códigos de escola
+  fictícios: o próprio dicionário do INEP descreve o campo como
+  <q>Máscaras dos Códigos de Escola</q>. O cruzamento com as escolas deste
+  projeto, pelo código do Censo, não encontra nenhuma correspondência. É
+  anonimização deliberada, coerente com a LGPD.
+</p>
+<p>
+  No lugar dele entra o <strong>salário médio mensal dos trabalhadores formais do
+  município</strong>, publicado pelo IBGE e referente a 2021, invertido da mesma
+  forma: contexto mais pobre eleva o risco. Cobre 100% das escolas do recorte.
+</p>
+<p>A troca tem três consequências, e nenhuma delas fica escondida:</p>
+<ul>
+  <li>
+    A granularidade cai de escola para município. <strong>Escolas do mesmo
+    município recebem o mesmo valor</strong> neste componente, que portanto não
+    as diferencia entre si.
+  </li>
+  <li>
+    Mede o território, e não as famílias dos estudantes daquela escola, que era
+    o que o INSE media.
+  </li>
+  <li>
+    Considera apenas o trabalho formal, então subestima a informalidade.
+  </li>
+</ul>
+<p>
+  Por isso este componente <strong>não é chamado de INSE</strong> em nenhum lugar
+  do painel. Se o INEP voltar a publicar o indicador por escola de forma
+  cruzável, ele reassume a vaga sem mudança de método.
+</p>
+
 <h2>Por que estes componentes</h2>
 <p>
   Bowers, Sprott e Taff (2013) demonstram que indicadores simples e diretamente
@@ -48,6 +96,176 @@
   Nóbrega e Nicolella (2015) tratam o abandono como combinação de fatores
   intraescolares e extraescolares, e não de causa única: por isso o índice reúne
   indicadores de trajetória e um indicador de contexto socioeconômico.
+</p>
+
+<h2>Previsão para o ano seguinte</h2>
+<p>
+  O índice acima descreve o presente. Para antecipar, é preciso outro
+  instrumento, e ele responde a esta pergunta:
+</p>
+<p class="introducao">
+  <strong>A partir dos indicadores da escola em um ano, ela estará no quartil
+  superior de abandono da sua unidade federativa no ano seguinte?</strong>
+</p>
+<div class="aviso" role="note">
+  <strong>O que está publicado hoje.</strong>
+  O modelo foi treinado na transição de 2023 para 2024, que é a única com dado
+  observado dos dois lados, e é nela que as métricas abaixo foram medidas. As
+  previsões exibidas no painel, porém, são de <strong>2025</strong>, calculadas
+  aplicando esse modelo aos indicadores de 2024. São previsões de verdade: o ano
+  previsto ainda não tem dado publicado pelo INEP, e só poderá ser conferido
+  quando o Censo de 2025 sair.
+</div>
+<p>
+  Os dados públicos não trazem um rótulo de escola em crise. Ele foi construído
+  pelo grupo com a regra acima, e isso é uma escolha, não uma medida oficial. O
+  quartil é calculado dentro de cada unidade federativa, porque comparar uma
+  escola do Acre com uma de Santa Catarina na mesma escala mediria sobretudo a
+  diferença entre os estados.
+</p>
+<p>
+  Dois modelos são treinados e comparados: uma regressão logística e uma floresta
+  aleatória. O critério de escolha é a <strong>sensibilidade</strong>, não a
+  acurácia. Com cerca de um quarto de casos positivos, um modelo que classificasse
+  todas as escolas como sem risco acertaria três quartos das vezes e não
+  encontraria escola nenhuma. Havendo empate técnico, prevalece o modelo
+  interpretável.
+</p>
+
+<div class="tabela-rolavel">
+  <table>
+    <caption>Desempenho no conjunto de teste, 25% das escolas, não usadas no treino</caption>
+    <thead>
+      <tr>
+        <th scope="col">Modelo</th>
+        <th scope="col" class="numero">Sensibilidade</th>
+        <th scope="col" class="numero">Especificidade</th>
+        <th scope="col" class="numero">AUC ROC</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Regressão logística, escolhida</th>
+        <td class="numero">0,561</td><td class="numero">0,748</td><td class="numero">0,722</td>
+      </tr>
+      <tr>
+        <th scope="row">Floresta aleatória</th>
+        <td class="numero">0,556</td><td class="numero">0,745</td><td class="numero">0,718</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Sensibilidade de 0,561 significa que o modelo aponta pouco mais da metade das
+  escolas que de fato pioraram. É um resultado modesto, e está declarado assim de
+  propósito: encontrar a escola que vai piorar importa mais do que evitar o
+  alarme falso, porque o custo de olhar uma escola que estava bem é baixo e o de
+  não olhar uma que piorou, alto.
+</p>
+<p>
+  Os coeficientes do modelo <strong>discordam dos pesos escolhidos a priori</strong>,
+  e essa divergência é um resultado do projeto, não um defeito. O abandono
+  passado pesa mais do que tudo, a distorção idade-série vem em segundo, e a
+  reprovação contribui menos do que o índice de regras supõe. O painel permite
+  alternar entre as duas leituras em vez de esconder o desacordo.
+</p>
+
+<h2>Como as duas leituras se cruzam</h2>
+<p>
+  Apresentadas uma de cada vez, as duas leituras produzem dois rankings, e um
+  ranking diz onde o problema é maior, mas não diz o que fazer. Cruzadas, elas
+  separam quatro situações que pedem respostas diferentes. É isso que a seção
+  <strong>Onde agir primeiro</strong> do painel mostra.
+</p>
+
+<div class="tabela-rolavel">
+  <table>
+    <caption>Os quatro grupos da matriz de decisão</caption>
+    <thead>
+      <tr>
+        <th scope="col">Grupo</th>
+        <th scope="col">Condição</th>
+        <th scope="col">Resposta indicada</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Deterioração</th>
+        <td>Situação aceitável hoje, previsão de risco alto</td>
+        <td>Agir agora. A escola ainda não entrou em crise.</td>
+      </tr>
+      <tr>
+        <th scope="row">Crise persistente</th>
+        <td>Risco alto hoje e previsão de risco alto</td>
+        <td>Intervenção estrutural.</td>
+      </tr>
+      <tr>
+        <th scope="row">Recuperação</th>
+        <td>Risco alto hoje, previsão de melhora</td>
+        <td>Manter o que está em curso e confirmar no próximo dado.</td>
+      </tr>
+      <tr>
+        <th scope="row">Estável</th>
+        <td>Situação aceitável hoje e previsão de continuidade</td>
+        <td>Acompanhamento de rotina.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  <strong>Deterioração é o grupo que justifica a matriz.</strong> São escolas que
+  não aparecem no topo do ranking atual, porque hoje estão bem, e que o modelo
+  aponta como prováveis casos de risco no ano seguinte. Nenhuma das duas leituras
+  isoladas as revela, e é exatamente nelas que a identificação precoce tem mais
+  valor.
+</p>
+<p>
+  Para formar quatro grupos, os três níveis de cada leitura viram dois:
+  <strong>risco alto contra os demais</strong>. É uma escolha do grupo, com uma
+  consequência a declarar: uma escola de risco médio aparece na matriz como
+  situação aceitável, o que não significa situação boa. A leitura em três níveis
+  continua disponível no ranking e na página de cada escola.
+</p>
+<p>
+  Escolas que aparecem em apenas um dos dois anos não recebem previsão e ficam
+  fora da matriz. O painel informa quantas são, em vez de somá-las a algum dos
+  quatro grupos.
+</p>
+
+<h2>Por que cada escola recebeu o número que recebeu</h2>
+<p>
+  Nenhum dos dois cálculos é uma caixa fechada. A página de cada escola abre a
+  conta dos dois, e as duas aberturas são <strong>exatas</strong>, não
+  aproximações ilustrativas.
+</p>
+<ul>
+  <li>
+    <strong>Índice baseado em regras.</strong> Cada indicador é posicionado de 0
+    a 100 dentro do grupo formado pela UF e pelo ano, multiplicado pelo seu peso,
+    e as parcelas são somadas. A tabela mostra as quatro parcelas, e elas somam
+    o índice exibido.
+  </li>
+  <li>
+    <strong>Modelo preditivo.</strong> A previsão é decomposta nas contribuições
+    de cada indicador, pelo método de percurso de árvore: em cada nó, a mudança
+    na probabilidade é creditada ao indicador que fez a divisão. A soma das
+    contribuições, somada ao ponto de partida do modelo, reproduz exatamente a
+    probabilidade exibida. Quando o modelo escolhido é a regressão logística, a
+    mesma decomposição vale sobre os coeficientes.
+  </li>
+</ul>
+<p>
+  O cálculo da explicação roda junto com o treino, na máquina local, e o
+  resultado é gravado no banco. O processo web apenas lê: isso mantém a página
+  rápida e dispensa carregar a biblioteca de modelos na nuvem.
+</p>
+<p>
+  Uma leitura exige cuidado, e a página avisa: o <strong>nível</strong> de risco
+  não vem de um limiar fixo de probabilidade. A escola é comparada às demais da
+  sua UF e dividida em três grupos de tamanho parecido, então uma probabilidade
+  abaixo de 50% pode cair em risco alto se for das mais altas do estado.
 </p>
 
 <h2>Limites, ditos com clareza</h2>
@@ -68,16 +286,28 @@
     A comparação só é válida dentro do mesmo grupo de unidade federativa e ano,
     porque a normalização acontece nesse recorte.
   </li>
+  <li>
+    O modelo preditivo dispõe de <strong>uma única transição entre anos</strong>,
+    de 2023 para 2024. Não é possível validá-lo em outro par de anos, que seria o
+    teste mais honesto de generalização.
+  </li>
+  <li>
+    O modelo prevê <strong>posição relativa dentro da unidade federativa</strong>,
+    não valor absoluto de abandono, e muito menos o que acontecerá com estudantes
+    individuais.
+  </li>
 </ul>
 
 <h2>Fontes de dados</h2>
 <ul>
-  <li><strong>INEP</strong>: indicadores educacionais de rendimento escolar, distorção idade-série e nível socioeconômico, por escola.</li>
-  <li><strong>IBGE</strong>: API de localidades, para municípios, unidades federativas e regiões.</li>
+  <li><strong>INEP</strong>: Taxas de Rendimento Escolar e Taxas de Distorção Idade-Série, por escola, edições de 2023 e 2024.</li>
+  <li><strong>IBGE</strong>: API de localidades, para municípios, unidades federativas e regiões; e API de indicadores do panorama municipal, para o contexto socioeconômico.</li>
 </ul>
 <p>
-  A relação exata dos arquivos usados, com data de acesso e número de registros,
-  está em <code>docs/FONTES_DE_DADOS.md</code> no repositório do projeto.
+  A relação exata dos arquivos usados, com data de acesso, soma de verificação e
+  número de registros, está em <code>docs/FONTES_DE_DADOS.md</code> no
+  repositório do projeto. A avaliação completa do modelo, com matriz de confusão
+  e coeficientes, está em <code>docs/AVALIACAO_DO_MODELO.md</code>.
 </p>
 
 <h2>Acessibilidade</h2>

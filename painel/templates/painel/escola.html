@@ -16,27 +16,43 @@
   <div class="cartao"><dt>Rede</dt><dd>{{ escola.get_rede_display }}</dd></div>
 </dl>
 
-<h2>Índice de risco por ano</h2>
-{% if riscos %}
+<h2>Trajetória observada</h2>
+<p class="introducao">
+  Índice de risco calculado para cada ano com dados publicados pelo INEP.
+  Descreve a situação da escola naquele ano.
+</p>
+{% if historico %}
   <div class="tabela-rolavel">
-    <table>
+    <table class="tabela-dados">
       <caption>
-        Índice de risco calculado para esta escola. O nível aparece em texto,
-        não apenas por cor. Versão do índice: <code>{{ versao_indice }}</code>.
+        Índice de 0 a 1, combinando abandono, reprovação, distorção idade-série
+        e contexto socioeconômico. O nível aparece em texto, não apenas por cor.
       </caption>
       <thead>
         <tr>
           <th scope="col">Ano</th>
           <th scope="col" class="numero">Índice</th>
           <th scope="col">Nível de risco</th>
+          <th scope="col">Em relação ao ano anterior</th>
         </tr>
       </thead>
       <tbody>
-        {% for r in riscos %}
+        {% for r in historico %}
           <tr>
             <th scope="row">{{ r.obj.ano }}</th>
             <td class="numero">{{ r.obj.score|floatformat:3 }}</td>
             <td><span class="tarja tarja-{{ r.obj.classe }}">{{ r.rotulo }}</span></td>
+            <td>
+              {% if r.sentido == "subiu" %}
+                <span class="variacao subiu">▲ +{{ r.variacao|floatformat:3 }}, piorou</span>
+              {% elif r.sentido == "caiu" %}
+                <span class="variacao caiu">▼ {{ r.variacao|floatformat:3 }}, melhorou</span>
+              {% elif r.sentido == "igual" %}
+                <span class="variacao igual">estável</span>
+              {% else %}
+                <span class="variacao igual">primeiro ano da série</span>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>
@@ -44,6 +60,121 @@
   </div>
 {% else %}
   <p>Nenhum índice calculado para esta escola.</p>
+{% endif %}
+
+{% if explicacao_indice %}
+  <details class="conta">
+    <summary>Como este índice foi calculado</summary>
+    <p class="nota">
+      Cada indicador é posicionado de 0 a 100 dentro do grupo formado pela UF e
+      pelo ano: 0 é o melhor valor do grupo, 100 o pior. A posição é multiplicada
+      pelo peso do componente, e a soma das parcelas é o índice.
+    </p>
+    <div class="tabela-rolavel">
+      <table class="tabela-dados">
+        <caption>Parcelas do índice do ano mais recente</caption>
+        <thead>
+          <tr>
+            <th scope="col">Componente</th>
+            <th scope="col" class="numero">Valor da escola</th>
+            <th scope="col" class="numero">Posição no grupo</th>
+            <th scope="col" class="numero">Peso</th>
+            <th scope="col" class="numero">Parcela</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in explicacao_indice %}
+            <tr>
+              <th scope="row">
+                {{ p.rotulo }}
+                {% if p.invertido %}<span class="nota">(invertido)</span>{% endif %}
+              </th>
+              <td class="numero">{{ p.valor|floatformat:1 }} {{ p.unidade }}</td>
+              <td class="numero">{{ p.posicao }} de 100</td>
+              <td class="numero">{{ p.peso }}%</td>
+              <td class="numero">{{ p.contribuicao|floatformat:3 }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="nota">
+      O componente invertido entra ao contrário: contexto socioeconômico melhor
+      reduz o risco, então um município mais rico recebe posição mais baixa.
+    </p>
+  </details>
+{% endif %}
+
+<h2>Previsão</h2>
+{% if previsao %}
+  {% comment %}
+    A previsao fica fora da tabela de proposito. Ela nao e mais um ano da serie:
+    e uma PROBABILIDADE, grandeza diferente do indice acima. Na mesma coluna, os
+    dois numeros sugeriam uma comparacao que nao existe.
+  {% endcomment %}
+  <div class="previsao previsao-{{ previsao.obj.classe }}">
+    <p class="previsao-ano">Para {{ previsao.ano_previsto }}</p>
+    <p class="previsao-nivel">
+      <span class="tarja tarja-{{ previsao.obj.classe }}">{{ previsao.rotulo }}</span>
+    </p>
+    <p class="previsao-numero">
+      <strong>{{ previsao.porcentagem }}%</strong> de probabilidade estimada de esta
+      escola estar entre as de maior abandono de {{ escola.uf }} em
+      {{ previsao.ano_previsto }}.
+    </p>
+    <p class="nota">
+      Calculada pelo modelo preditivo a partir dos indicadores de
+      {{ previsao.ano_base }}. <strong>Não é comparável ao índice da tabela
+      acima</strong>: ali é um índice composto de 0 a 1, aqui é uma
+      probabilidade. O método está na
+      <a href="{% url 'sobre' %}">página de metodologia</a>.
+    </p>
+
+    {% if previsao.explicacao %}
+      <h3 class="porque">Por que esta previsão</h3>
+      {% if previsao.explicacao.base_porcentagem %}
+        <p class="partida">
+          O modelo parte de <strong>{{ previsao.explicacao.base_porcentagem }}%</strong>,
+          que é a probabilidade média antes de olhar para esta escola. Os
+          indicadores dela levaram esse número até
+          <strong>{{ previsao.porcentagem }}%</strong>.
+        </p>
+      {% endif %}
+      <ul class="contribuicoes">
+        {% for c in previsao.explicacao.itens %}
+          <li>
+            <span class="contrib-barra" aria-hidden="true">
+              <span class="contrib-preenchida contrib-{{ c.sentido }}"
+                    style="width: {{ c.participacao }}%"></span>
+            </span>
+            <span class="contrib-texto">
+              <strong>{{ c.rotulo }}</strong>, {{ c.valor_descrito }},
+              {% if c.sentido == "aumenta" %}aumenta{% else %}reduz{% endif %}
+              o risco previsto. Responde por {{ c.participacao }}% do que moveu
+              esta previsão.
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="nota">
+        Decomposição exata da previsão produzida pelo modelo
+        ({{ previsao.explicacao.modelo }}): as contribuições somadas à base
+        reproduzem o número acima. A porcentagem indica a participação de cada
+        indicador no total movido, e não a probabilidade em si.
+      </p>
+      <p class="nota">
+        O nível de risco não vem de um limiar fixo de probabilidade: a escola é
+        comparada às demais da sua UF e dividida em três grupos de tamanho
+        parecido. Por isso uma probabilidade abaixo de 50% pode cair em risco
+        alto, se for das mais altas do estado.
+      </p>
+    {% endif %}
+  </div>
+{% else %}
+  <p>
+    Esta escola não recebeu previsão. O modelo precisa dos indicadores do ano
+    mais recente, e eles não estão disponíveis para ela.
+  </p>
 {% endif %}
 
 <h2>Indicadores por ano</h2>

@@ -13,5 +13,6 @@ router.register("risco", api.IndiceRiscoViewSet, basename="risco")
 urlpatterns = [
     path("indicadores/resumo/", api.resumo, name="api-resumo"),
     path("indicadores/dispersao/", api.dispersao, name="api-dispersao"),
+    path("indicadores/matriz/", api.matriz_decisao, name="api-matriz"),
     path("", include(router.urls)),
 ]

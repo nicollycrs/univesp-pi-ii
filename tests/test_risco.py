@@ -2,8 +2,8 @@
 Testes do indice de risco.
 
 Cobrem o que pode dar errado em silencio e estragar o resultado do projeto: a
-inversao do INSE, a normalizacao por grupo, o tratamento de ausentes e a garantia
-de que o rotulo textual sempre acompanha a classe.
+inversao do componente socioeconomico, a normalizacao por grupo, o tratamento de
+ausentes e a garantia de que o rotulo textual sempre acompanha a classe.
 """
 
 import pytest
@@ -18,7 +18,7 @@ def _registro(**kwargs):
         "taxa_abandono": 10.0,
         "taxa_reprovacao": 10.0,
         "distorcao_idade_serie": 20.0,
-        "inse": 50.0,
+        "contexto_socioeconomico": 2.0,
     }
     base.update(kwargs)
     return base
@@ -28,32 +28,32 @@ class TestOrdenacao:
     def test_escola_pior_em_tudo_tem_score_maior(self):
         registros = [
             _registro(co_entidade=1, taxa_abandono=2, taxa_reprovacao=2,
-                      distorcao_idade_serie=5, inse=80),
+                      distorcao_idade_serie=5, contexto_socioeconomico=4.0),
             _registro(co_entidade=2, taxa_abandono=30, taxa_reprovacao=25,
-                      distorcao_idade_serie=60, inse=25),
+                      distorcao_idade_serie=60, contexto_socioeconomico=1.2),
         ]
         saida = {r["co_entidade"]: r for r in risco.calcular(registros)}
         assert saida[2]["score"] > saida[1]["score"]
 
     def test_score_fica_entre_zero_e_um(self):
         registros = [
-            _registro(co_entidade=i, taxa_abandono=i * 3, inse=80 - i * 5)
+            _registro(co_entidade=i, taxa_abandono=i * 3, contexto_socioeconomico=5.0 - i * 0.3)
             for i in range(1, 11)
         ]
         for r in risco.calcular(registros):
             assert 0.0 <= r["score"] <= 1.0
 
 
-class TestInseInvertido:
-    def test_inse_menor_eleva_o_risco(self):
+class TestContextoSocioeconomicoInvertido:
+    def test_contexto_menor_eleva_o_risco(self):
         """
-        O INSE e o unico componente invertido. Se a inversao quebrar, escolas de
+        E o unico componente invertido. Se a inversao quebrar, escolas de
         contexto socioeconomico alto passariam a aparecer como as mais criticas,
         e o painel inteiro perderia sentido.
         """
         registros = [
-            _registro(co_entidade=1, inse=20),  # nivel baixo, risco maior
-            _registro(co_entidade=2, inse=80),  # nivel alto, risco menor
+            _registro(co_entidade=1, contexto_socioeconomico=1.2),  # contexto pobre, risco maior
+            _registro(co_entidade=2, contexto_socioeconomico=4.0),  # nivel alto, risco menor
         ]
         saida = {r["co_entidade"]: r for r in risco.calcular(registros)}
         assert saida[1]["score"] > saida[2]["score"]
@@ -88,8 +88,8 @@ class TestNormalizacaoPorGrupo:
 class TestAusentes:
     def test_componente_ausente_redistribui_peso_e_mantem_escala(self):
         registros = [
-            _registro(co_entidade=1, inse=None),
-            _registro(co_entidade=2, inse=None, taxa_abandono=30),
+            _registro(co_entidade=1, contexto_socioeconomico=None),
+            _registro(co_entidade=2, contexto_socioeconomico=None, taxa_abandono=30),
         ]
         saida = {r["co_entidade"]: r for r in risco.calcular(registros)}
         for r in saida.values():
@@ -103,7 +103,7 @@ class TestAusentes:
                 taxa_abandono=None,
                 taxa_reprovacao=None,
                 distorcao_idade_serie=None,
-                inse=None,
+                contexto_socioeconomico=None,
             )
         ]
         saida = risco.calcular(registros)
@@ -120,7 +120,7 @@ class TestClassificacao:
     def test_tres_niveis_aparecem_em_grupo_disperso(self):
         registros = [
             _registro(co_entidade=i, taxa_abandono=i, distorcao_idade_serie=i * 2,
-                      inse=80 - i * 2)
+                      contexto_socioeconomico=5.0 - i * 0.2)
             for i in range(1, 31)
         ]
         classes = {r["classe"] for r in risco.calcular(registros)}
