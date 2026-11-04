@@ -108,13 +108,14 @@
   superior de abandono da sua unidade federativa no ano seguinte?</strong>
 </p>
 <div class="aviso" role="note">
-  <strong>O que está publicado hoje.</strong>
-  O modelo foi treinado na transição de 2023 para 2024, que é a única com dado
-  observado dos dois lados, e é nela que as métricas abaixo foram medidas. As
-  previsões exibidas no painel, porém, são de <strong>2025</strong>, calculadas
-  aplicando esse modelo aos indicadores de 2024. São previsões de verdade: o ano
-  previsto ainda não tem dado publicado pelo INEP, e só poderá ser conferido
-  quando o Censo de 2025 sair.
+  <strong>O modelo foi conferido contra a realidade.</strong>
+  Ele é treinado na transição de 2023 para 2024, e as previsões exibidas são de
+  2025, calculadas a partir dos indicadores de 2024. Com a publicação dos dados
+  de 2025 pelo INEP, essas previsões foram confrontadas com o que de fato
+  aconteceu em <strong>19.941 escolas</strong>: sensibilidade
+  <strong>0,561</strong>, especificidade <strong>0,744</strong> e AUC
+  <strong>0,696</strong>, contra 0,581, 0,735 e 0,726 medidos na partição de
+  teste do treino. O desempenho se sustentou fora do tempo de treino.
 </div>
 <p>
   Os dados públicos não trazem um rótulo de escola em crise. Ele foi construído
@@ -287,9 +288,8 @@
     porque a normalização acontece nesse recorte.
   </li>
   <li>
-    O modelo preditivo dispõe de <strong>uma única transição entre anos</strong>,
-    de 2023 para 2024. Não é possível validá-lo em outro par de anos, que seria o
-    teste mais honesto de generalização.
+    O modelo foi validado em <strong>uma única transição futura</strong>, a de
+    2024 para 2025. Uma segunda daria leitura mais firme sobre estabilidade.
   </li>
   <li>
     O modelo prevê <strong>posição relativa dentro da unidade federativa</strong>,

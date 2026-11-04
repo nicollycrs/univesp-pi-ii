@@ -236,7 +236,37 @@ mudança de estrutura.
 
 ---
 
-## 6. Amostra de desenvolvimento
+## 6. Taxas de 2025: o ano de validação
+
+**Situação: baixado e usado para validar o modelo, não para alimentar o painel.**
+
+| | Rendimento | Distorção |
+|---|---|---|
+| **URL** | `.../indicadores_educacionais/2025/tx_rend_escolas_2025.zip` | `.../2025/TDI_2025_ESCOLAS.zip` |
+| **Publicado pelo INEP** | 26/06/2026 | 26/02/2026 |
+| **Data de acesso** | 03/11/2026 | 03/11/2026 |
+| **Tamanho** | 66.870.247 bytes | 34.465.795 bytes |
+| **MD5 do zip** | `180dd0980ec5ce8b1df827f9a56851e4` | `7cb6ca82c8315af9c49f8060edea542e` |
+| **Registros após o recorte** | 20.594 escolas em 27 UFs | 126.605 linhas unidas |
+
+A soma das três taxas fecha em 100,00 exatos, mesma verificação de sanidade dos
+outros anos.
+
+Estes arquivos entram por um caminho diferente dos demais: **não alimentam o
+painel**, e sim servem de gabarito. As previsões de 2025 já estavam gravadas,
+calculadas a partir de 2024, e este é o ano que permite conferi-las. O resultado
+está em [AVALIACAO_DO_MODELO.md](AVALIACAO_DO_MODELO.md) e, completo, em
+[VALIDACAO_2025.md](VALIDACAO_2025.md).
+
+Observação relevante para o relatório: **o abandono caiu**. A média do recorte
+foi de 3,54% em 2024 para 2,58% em 2025, e a fatia de escolas com abandono zero
+subiu de 29,9% para 38,5%. Isso tem consequência metodológica, porque comprime a
+distribuição e faz o corte do quartil cair sobre valores empatados. Está tratado
+em `etl/modelo.py`, na função `rotular_observado`.
+
+---
+
+## 7. Amostra de desenvolvimento
 
 **Situação: não mais necessária, mantida para testes.**
 

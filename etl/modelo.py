@@ -477,3 +477,66 @@ def explicar(modelo, base: pd.DataFrame, maximo: int | None = None) -> list[dict
             }
         )
     return saida
+
+
+# ----------------------------------------------------------------- validacao
+#
+# Validacao prospectiva: confronta a previsao guardada com o ano que de fato
+# aconteceu. E diferente, e mais exigente, que a particao de teste do treino:
+# ali as linhas vinham do mesmo par de anos; aqui o ano observado e posterior a
+# tudo que o modelo viu.
+
+
+def rotular_observado(df: pd.DataFrame, por_posto: bool = True) -> pd.Series:
+    """
+    Marca, no ano observado, quem ficou no quartil superior de abandono da UF.
+
+    `por_posto` decide como os empates sao tratados, e a escolha importa:
+
+    A regra literal (`taxa >= quantil`) funciona quando poucos valores empatam
+    no corte, que era o caso em 2024, com 0,9% das escolas exatamente nele. Em
+    2025 o abandono caiu, a distribuicao comprimiu perto de zero e 9,8% das
+    escolas cairam em cima do corte; em duas UFs o proprio corte virou zero, o
+    que promoveria a positiva toda escola sem nenhum abandono. Os positivos
+    subiriam para 33,7% e a comparacao com o treino, onde eram 25,6%, deixaria
+    de ser justa.
+
+    Por posto, o corte pega sempre o quarto superior, desempatando pela ordem
+    de aparicao. Mantem a proporcao estavel entre anos, que e o que torna as
+    metricas comparaveis.
+    """
+    if por_posto:
+        # rank(pct=True) devolve posicao/n, indo de 1/n ate 1. A escola esta no
+        # quarto superior quando posicao > n * 0,75, ou seja, quando o
+        # percentual e ESTRITAMENTE maior que o quantil. Com >= entraria uma
+        # escola a mais por UF.
+        posicao = df.groupby("uf")["taxa_abandono"].rank(pct=True, method="first")
+        return (posicao > QUANTIL_ALVO).astype(int)
+    cortes = df.groupby("uf")["taxa_abandono"].quantile(QUANTIL_ALVO)
+    return (df["taxa_abandono"] >= df["uf"].map(cortes)).astype(int)
+
+
+def validar(observado: pd.DataFrame, previsto: pd.DataFrame) -> Avaliacao:
+    """
+    Metricas da previsao contra o ocorrido.
+
+    `observado` precisa de co_entidade e da coluna `ocorreu`; `previsto`, de
+    co_entidade, score e classe. O alerta avaliado e o do painel: classe alta.
+    """
+    base = observado.merge(previsto, on="co_entidade", how="inner")
+    if base.empty:
+        raise ValueError("Nenhuma escola em comum entre previsao e ano observado.")
+
+    y = base["ocorreu"].to_numpy(dtype=int)
+    alerta = (base["classe"] == "alto").astype(int).to_numpy()
+    matriz = confusion_matrix(y, alerta)
+    vn, fp, _fn, _vp = matriz.ravel()
+
+    return Avaliacao(
+        nome="Previsão confrontada com o ano observado",
+        sensibilidade=recall_score(y, alerta, zero_division=0),
+        especificidade=vn / (vn + fp) if (vn + fp) else 0.0,
+        precisao=precision_score(y, alerta, zero_division=0),
+        auc=roc_auc_score(y, base["score"].to_numpy()),
+        matriz=matriz,
+    )

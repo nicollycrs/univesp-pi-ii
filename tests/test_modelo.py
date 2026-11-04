@@ -419,3 +419,98 @@ class TestExplicabilidade:
             assert base_lote == pytest.approx(base_um, abs=1e-9)
             for j, nome in enumerate(modelo.ATRIBUTOS):
                 assert matriz[i][j] == pytest.approx(contrib_um[nome], abs=1e-9)
+
+
+class TestValidacaoProspectiva:
+    """
+    Validacao contra um ano ja observado.
+
+    O risco coberto aqui nao e o modelo ir mal: e a MEDICAO estar errada. Um
+    rotulo construido de forma diferente da usada no treino produz numeros que
+    parecem desempenho e sao artefato.
+    """
+
+    @pytest.fixture
+    def observado(self):
+        """
+        Ano observado com empate deliberado no corte.
+
+        Metade das escolas de SP tem abandono zero, que e o caso real de 2025:
+        a distribuicao comprimiu perto de zero e o quartil caiu sobre um valor
+        repetido.
+        """
+        return pd.DataFrame({
+            "co_entidade": range(1, 21),
+            "uf": ["SP"] * 20,
+            "taxa_abandono": [0.0] * 10 + [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+        })
+
+    def test_por_posto_mantem_um_quarto(self, observado):
+        rotulo = modelo.rotular_observado(observado, por_posto=True)
+        assert rotulo.sum() == 5  # 25% de 20
+
+    def test_regra_literal_infla_quando_o_corte_cai_em_empate(self):
+        """
+        O defeito que a opcao por posto evita. Com a distribuicao comprimida, o
+        quartil cai sobre um valor repetido e a regra literal leva junto todas
+        as escolas empatadas nele.
+        """
+        df = pd.DataFrame({
+            "co_entidade": range(1, 21),
+            "uf": ["SP"] * 20,
+            "taxa_abandono": [2.0] * 16 + [5.0, 6.0, 7.0, 8.0],
+        })
+        literal = modelo.rotular_observado(df, por_posto=False)
+        posto = modelo.rotular_observado(df, por_posto=True)
+        assert posto.sum() == 5
+        assert literal.sum() > posto.sum()
+
+    def test_corte_zero_promoveria_todo_mundo(self):
+        """
+        O caso extremo que apareceu em duas UFs de 2025: com o corte em zero, a
+        regra literal marca como em risco toda escola sem nenhum abandono.
+        """
+        df = pd.DataFrame({
+            "co_entidade": range(1, 11),
+            "uf": ["AC"] * 10,
+            "taxa_abandono": [0.0] * 8 + [5.0, 9.0],
+        })
+        assert modelo.rotular_observado(df, por_posto=False).sum() == 10
+        assert modelo.rotular_observado(df, por_posto=True).sum() < 10
+
+    def test_rotulo_e_por_uf(self):
+        """
+        Cada UF tem o proprio corte, como no treino. Sem isso a validacao
+        mediria a diferenca entre estados.
+        """
+        df = pd.DataFrame({
+            "co_entidade": range(1, 9),
+            "uf": ["SP"] * 4 + ["AC"] * 4,
+            "taxa_abandono": [1.0, 2.0, 3.0, 4.0, 20.0, 30.0, 40.0, 50.0],
+        })
+        rotulo = modelo.rotular_observado(df, por_posto=True)
+        # A pior de SP entra, apesar de ter abandono menor que toda escola do AC.
+        assert rotulo.iloc[3] == 1
+        assert rotulo.iloc[4] == 0
+
+    def test_validar_calcula_as_metricas(self):
+        observado = pd.DataFrame({
+            "co_entidade": [1, 2, 3, 4],
+            "ocorreu": [1, 1, 0, 0],
+        })
+        previsto = pd.DataFrame({
+            "co_entidade": [1, 2, 3, 4],
+            "score": [0.9, 0.3, 0.8, 0.1],
+            "classe": ["alto", "baixo", "alto", "baixo"],
+        })
+        aval = modelo.validar(observado, previsto)
+        assert aval.sensibilidade == pytest.approx(0.5)
+        assert aval.especificidade == pytest.approx(0.5)
+
+    def test_validar_exige_escolas_em_comum(self):
+        observado = pd.DataFrame({"co_entidade": [1], "ocorreu": [1]})
+        previsto = pd.DataFrame(
+            {"co_entidade": [99], "score": [0.5], "classe": ["alto"]}
+        )
+        with pytest.raises(ValueError, match="Nenhuma escola em comum"):
+            modelo.validar(observado, previsto)

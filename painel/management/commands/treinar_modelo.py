@@ -140,6 +140,20 @@ class Command(BaseCommand):
             for linha in previsoes.itertuples()
         ]
         with transaction.atomic():
+            # Substituicao completa, e nao acumulo.
+            #
+            # O conjunto de escolas previstas muda entre execucoes: quando o
+            # modelo passou a prever a partir de um unico ano, 56 escolas da
+            # rodada anterior deixaram de ser previstas e ficaram no banco com
+            # o score antigo, de uma versao que previa outro ano. O upsert nao
+            # as removia, porque so toca nas linhas que recebe.
+            #
+            # As previsoes de uma versao sao um retrato, nao um historico: cada
+            # treino as refaz por inteiro.
+            apagadas, _ = IndiceRisco.objects.filter(versao=M.VERSAO).delete()
+            if apagadas:
+                self.stdout.write(f"  {apagadas} previsoes anteriores substituidas")
+
             IndiceRisco.objects.bulk_create(
                 objetos, batch_size=2000, update_conflicts=True,
                 update_fields=["score", "classe", "detalhes"],

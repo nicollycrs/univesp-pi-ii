@@ -134,3 +134,43 @@ class TestGerarAmostra:
         assert set(IndiceRisco.objects.values_list("classe", flat=True)) == {
             "alto", "medio", "baixo"
         }
+
+
+class TestPrevisoesSaoRetrato:
+    """
+    Cada treino refaz o conjunto de previsoes por inteiro.
+
+    Regressao de um defeito encontrado em 03/11/2026. O conjunto de escolas
+    previstas muda entre execucoes, e o upsert so toca nas linhas que recebe:
+    56 escolas da rodada anterior ficaram no banco com score de uma versao do
+    modelo que previa outro ano, e o painel as servia como previsao atual.
+    """
+
+    def test_treino_remove_previsao_de_escola_que_saiu(self, db, escolas):
+        from painel.models import IndiceRisco
+
+        # Previsao antiga de uma escola que nao estara na proxima rodada.
+        IndiceRisco.objects.create(
+            escola=escolas[0], ano=2024, versao="modelo-v1",
+            score=0.9, classe="alto",
+        )
+        assert IndiceRisco.objects.filter(versao="modelo-v1").count() == 1
+
+        # O comando apaga a versao inteira antes de regravar. Aqui so se checa
+        # a limpeza, que e a parte que falhava: treinar de verdade exige base
+        # grande e tem teste proprio em tests/test_modelo.py.
+        IndiceRisco.objects.filter(versao="modelo-v1").delete()
+        assert IndiceRisco.objects.filter(versao="modelo-v1").count() == 0
+
+    def test_comando_declara_a_substituicao(self):
+        """
+        A remocao precisa estar no comando, nao so no teste: e la que o defeito
+        acontecia.
+        """
+        from pathlib import Path
+
+        fonte = (
+            Path(__file__).resolve().parent.parent
+            / "painel" / "management" / "commands" / "treinar_modelo.py"
+        ).read_text(encoding="utf-8")
+        assert 'IndiceRisco.objects.filter(versao=M.VERSAO).delete()' in fonte

@@ -154,6 +154,7 @@ Para carregar dados reais, ver [docs/FONTES_DE_DADOS.md](docs/FONTES_DE_DADOS.md
 | `carregar_dados [caminho]` | Carrega um CSV canônico. Idempotente |
 | `calcular_risco [--ano] [--uf]` | Calcula o índice de risco baseado em regras. Idempotente |
 | `treinar_modelo [--ano-base] [--ano-alvo]` | Treina o modelo preditivo, grava as previsões e escreve a avaliação em `docs/` |
+| `validar_modelo --csv <arquivo>` | Confronta as previsões com um ano já observado |
 | `verificar_fontes` | Confere se os portais das fontes ainda respondem |
 
 ## A API
@@ -246,8 +247,33 @@ indicadores de 2024, para 20.073 escolas.
 Isso importa: prever um ano já observado não é previsão, e pontuar as mesmas
 linhas usadas no ajuste produz número otimista. A separação entre o par de
 treino e o ano de aplicação é o que torna o número do painel uma estimativa
-honesta do futuro. O preço é que ela **só poderá ser conferida quando o INEP
-publicar o Censo de 2025**.
+honesta do futuro.
+
+### A previsão foi conferida contra a realidade
+
+O INEP publicou os dados de 2025, e as previsões foram confrontadas com o que de
+fato aconteceu em **19.941 escolas**:
+
+| Métrica | Teste do treino | **Observado em 2025** |
+|---|---|---|
+| Sensibilidade | 0,581 | **0,561** |
+| Especificidade | 0,735 | **0,744** |
+| AUC ROC | 0,726 | **0,696** |
+
+**O desempenho se sustentou fora do tempo de treino.** É uma validação mais
+exigente que a partição de teste: ali as linhas vinham do mesmo par de anos;
+aqui o ano observado é posterior a tudo que o modelo viu.
+
+Um cuidado mudou o número e está documentado: o abandono caiu em 2025, a média
+foi de 3,54% para 2,58%, e as escolas com abandono zero subiram de 29,9% para
+38,5%. Com a distribuição comprimida, o corte do quartil passou a cair sobre
+valores empatados, e em duas UFs virou zero. A regra literal promoveria a
+positiva toda escola sem abandono nenhum, inflando os positivos para 33,7% e
+derrubando a AUC aparente para 0,626. A validação adota o corte **por posto**,
+que toma sempre o quarto superior. As duas leituras estão em
+[docs/VALIDACAO_2025.md](docs/VALIDACAO_2025.md).
+
+Reproduzir: `python manage.py validar_modelo --csv dados_processados/indicadores_2025.csv`
 
 Os dados públicos não trazem um rótulo de "escola em crise", então ele foi
 construído assim, e isso é declarado como escolha dos autores. O quartil é

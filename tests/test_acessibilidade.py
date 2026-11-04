@@ -369,8 +369,19 @@ class TestMetodologiaFielAoCodigo:
 
     def test_limites_do_modelo_estao_declarados(self, client, db):
         html = self._html(client)
-        assert "uma única transição entre anos" in html
+        assert "uma única transição futura" in html
         assert "posição relativa" in html
+
+    def test_validacao_contra_o_ano_observado_e_declarada(self, client, db):
+        """
+        O modelo deixou de ser so promessa: as previsoes de 2025 foram
+        confrontadas com o publicado. A pagina precisa trazer o numero medido,
+        e nao apenas o da particao de teste, que e mais generoso.
+        """
+        html = self._html(client)
+        assert "conferido contra a realidade" in html
+        assert "19.941 escolas" in html
+        assert "0,561" in html
 
     def test_substituicao_do_inse_e_declarada(self, client, db):
         """
