@@ -379,6 +379,29 @@ class TestExplicabilidade:
             for c in e["contribuicoes"]:
                 assert c["atributo"] in modelo.ATRIBUTOS
 
+    def test_base_explicada_e_sempre_uma_probabilidade(self, base_sintetica):
+        """
+        Regressao: a pagina da escola anuncia a base como "a probabilidade
+        media antes de olhar para esta escola". Na logistica ela sai de
+        `contribuicoes` em log-odds, e o intercepto negativo chegava a tela
+        como "o modelo parte de -9%". Probabilidade nao e negativa.
+        """
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import StandardScaler
+
+        tubo = Pipeline([
+            ("escala", StandardScaler()),
+            ("clf", LogisticRegression(max_iter=1000, random_state=modelo.SEMENTE)),
+        ]).fit(
+            base_sintetica[modelo.ATRIBUTOS].to_numpy(dtype=float),
+            base_sintetica["alvo"].to_numpy(dtype=int),
+        )
+
+        for treinado in (tubo, modelo.treinar(base_sintetica)[0]):
+            for e in modelo.explicar(treinado, base_sintetica.head(10)):
+                assert 0.0 <= e["base"] <= 1.0, e["base"]
+
     def test_limita_aos_atributos_mais_influentes(self, base_sintetica):
         treinado, _, _ = modelo.treinar(base_sintetica)
         explicacoes = modelo.explicar(treinado, base_sintetica.head(5), maximo=3)

@@ -11,6 +11,8 @@ Criterios cobertos aqui: 1.4.1, 1.4.3, 1.4.11, 3.1.1, 1.1.1 e 2.4.1.
 import re
 from pathlib import Path
 
+import json
+
 import pytest
 from django.urls import reverse
 
@@ -762,3 +764,34 @@ class TestIdentidadeVisual:
         """
         html = re.sub(r"\s+", " ", client.get("/").content.decode())
         assert "<span>Educa</span><strong>Alerta</strong>" in html
+
+class TestMetricasPublicadas:
+    """
+    A pagina de metodologia traz os numeros do modelo escritos no template.
+    Eles ja divergiram do modelo de verdade: a pagina anunciava sensibilidade
+    0,561 enquanto o modelo em producao media 0,565, e a propria pagina se
+    contradizia, porque a caixa de validacao logo acima citava o valor certo.
+    Este teste falha se o template voltar a divergir de
+    docs/AVALIACAO_DO_MODELO.json, que e gerado pelo comando de treino.
+    """
+
+    CAMINHO_JSON = Path(__file__).resolve().parent.parent / "docs" / "AVALIACAO_DO_MODELO.json"
+    CAMINHO_HTML = (
+        Path(__file__).resolve().parent.parent
+        / "painel" / "templates" / "painel" / "sobre.html"
+    )
+
+    def test_sobre_html_repete_as_metricas_do_modelo_escolhido(self):
+        if not self.CAMINHO_JSON.exists():
+            pytest.skip("avaliacao do modelo ainda nao foi gerada")
+
+        metricas = json.loads(self.CAMINHO_JSON.read_text(encoding="utf-8"))
+        html = self.CAMINHO_HTML.read_text(encoding="utf-8")
+
+        for chave in ("sensibilidade", "especificidade", "auc"):
+            esperado = ("%.3f" % metricas[chave]).replace(".", ",")
+            assert esperado in html, (
+                "A pagina de metodologia nao traz %s=%s do modelo escolhido. "
+                "Rode manage.py treinar_modelo e atualize sobre.html."
+                % (chave, esperado)
+            )

@@ -450,6 +450,12 @@ def explicar(modelo, base: pd.DataFrame, maximo: int | None = None) -> list[dict
             bases.append(b)
             linhas.append([c[nome] for nome in ATRIBUTOS])
         matriz_contrib = np.array(linhas)
+        # A base da logistica sai em log-odds, mas a pagina da escola a
+        # apresenta como probabilidade. Sem converter aqui, um intercepto
+        # negativo virava "o modelo parte de -9%", que nao existe. As
+        # contribuicoes continuam em log-odds de proposito: a interface so
+        # mostra a participacao RELATIVA de cada atributo, nunca o valor cru.
+        bases = [float(1.0 / (1.0 + np.exp(-b))) for b in bases]
 
     valores = base[ATRIBUTOS].to_numpy(dtype=float)
     codigos = base["co_entidade"].tolist()
